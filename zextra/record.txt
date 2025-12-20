@@ -28,3 +28,18 @@ stockfish returns data in what piece needs to be moved where to the program
 program will find the best way to move that piece 
 based on algorithms and models it will move pieces 
 camera records 
+
+okay now would would we do stockfish moves
+essentially lets have it like this
+when we run test.py
+this will then give us options(1 for now -start game)
+
+once it starts for now notis will go to terminal output
+robot will alywasy be red(as black is the board), and red has the sames rules as black 
+and the opponenet will alwauysy have white and will therefore always go first 
+each side will have 1 minute to make their move
+when we start the game take a pic
+when we start our turn we take a pic 
+something/somewhat to find out what pice moved, send that to stockfish 
+stockfish gives us a best move 
+then we will have arm moving
