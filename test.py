@@ -6,14 +6,22 @@ import chess
 import chess.engine
 import time
 
+# =========================
+# CONFIG
+# =========================
+
 CAMERA_INDEXES = [4, 6, 3]  # wrist(4), top(6), side(3)
 CALIB_FILE = "board_calib_4pt.json"
-BOARD_SIZE = 800  
+BOARD_SIZE = 800  # The warped board will be BOARD_SIZE x BOARD_SIZE
 OCCUPANCY_THRESHOLD = 140
 CENTER_MARGIN = 0.25
 FRAME_WIDTH = 640
 FRAME_HEIGHT = 480
 FPS = 30
+
+# =========================
+# GLOBALS
+# =========================
 
 clicked_points = []
 
@@ -143,8 +151,8 @@ def main():
         if any(frame is None for frame in frames):
             continue
 
-        # Process top-down view for chess detection (index 1 is the top camera)
-        warped = warp_board(frames[1], calib["points"])
+        # Process top-down view for chess detection (index 0 is the top camera)
+        warped = warp_board(frames[0], calib["points"])
         sq = BOARD_SIZE // 8
 
         # Loop through all squares and check occupancy
@@ -179,16 +187,17 @@ def main():
                 )
 
         # Display all camera feeds in a grid layout
-        wrist_view = frames[0]
-        side_view = frames[2]
+        top_view = frames[0]
+        side_view = frames[1]
+        wrist_view = frames[2]
 
         # Resize for display consistency
-        wrist_view = cv2.resize(wrist_view, (300, 300))
+        top_view = cv2.resize(top_view, (300, 300))
         side_view = cv2.resize(side_view, (300, 300))
-        warped = cv2.resize(warped, (600, 600))
+        wrist_view = cv2.resize(wrist_view, (300, 300))
 
-        # Stack the views: wrist (left), top (middle), side (right)
-        combined_view = np.hstack((wrist_view, warped, side_view))
+        # Stack the three camera views horizontally
+        combined_view = np.hstack((top_view, side_view, wrist_view))
 
         # Show the combined view along with the warped board
         cv2.imshow("board", warped)
