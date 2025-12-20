@@ -232,6 +232,189 @@ def center_crop(img, margin):
         return None
     return img[dy:h-dy, dx:w-dx]
 
+def calibrate_piece_colors(rotated_board):
+    """
+    Calibrate by learning the colors of your specific pieces and board
+    """
+    print("\nCOLOR CALIBRATION MODE")
+    print("This will help the system learn your piece and board colors")
+    print("Follow the prompts to click on different squares")
+    
+    sq = BOARD_SIZE // 8
+    board_colors = []
+    piece_colors = []
+    
+    # Sample empty squares first
+    print("\nStep 1: Click on 3-4 EMPTY squares of different colors")
+    print("Click squares, then press SPACE to continue")
+    
+    cv2.namedWindow("color_calib", cv2.WINDOW_NORMAL)
+    cv2.resizeWindow("color_calib", 800, 800)
+    
+    clicked_samples = []
+    
+    def color_mouse_cb(event, x, y, flags, param):
+        if event == cv2.EVENT_LBUTTONDOWN:
+            # Find which square was clicked
+            c = x // sq
+            r = y // sq
+            if 0 <= r < 8 and 0 <= c < 8:
+                x1, y1 = c * sq, r * sq
+                x2, y2 = x1 + sq, y1 + sq
+                square_img = rotated_board[y1:y2, x1:x2]
+                
+                # Get average color of the center area
+                center = center_crop(square_img, 0.3)  # Use more of the square
+                if center is not None:
+                    avg_color = np.mean(center.reshape(-1, 3), axis=0)
+                    file_char = chr(ord('a') + c)
+                    rank_char = str(8 - r)
+                    square_name = f"{file_char}{rank_char}"
+                    
+                    clicked_samples.append((square_name, avg_color, x, y))
+                    print(f"Sampled {square_name}: RGB({avg_color[2]:.1f}, {avg_color[1]:.1f}, {avg_color[0]:.1f})")
+    
+    cv2.setMouseCallback("color_calib", color_mouse_cb)
+    
+    # Sample empty squares
+    while True:
+        display_board = rotated_board.copy()
+        
+        # Draw grid
+        for r in range(1, 8):
+            cv2.line(display_board, (0, r * sq), (BOARD_SIZE, r * sq), (255, 0, 0), 1)
+            cv2.line(display_board, (r * sq, 0), (r * sq, BOARD_SIZE), (255, 0, 0), 1)
+        
+        # Mark clicked squares
+        for _, _, x, y in clicked_samples:
+            cv2.circle(display_board, (x, y), 10, (0, 255, 0), -1)
+        
+        cv2.putText(display_board, f"Empty squares sampled: {len(clicked_samples)}", 
+                   (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
+        cv2.putText(display_board, "Click empty squares, SPACE when done", 
+                   (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+        
+        cv2.imshow("color_calib", display_board)
+        
+        key = cv2.waitKey(1) & 0xFF
+        if key == ord(' ') and len(clicked_samples) >= 3:
+            break
+        elif key == 27:  # ESC
+            cv2.destroyWindow("color_calib")
+            return None
+    
+    # Store board colors
+    board_colors = [color for _, color, _, _ in clicked_samples]
+    
+    # Now sample pieces
+    print(f"\nStep 2: Click on 3-4 squares with PIECES")
+    print("Click squares with pieces, then press SPACE to continue")
+    
+    clicked_samples = []  # Reset for pieces
+    
+    while True:
+        display_board = rotated_board.copy()
+        
+        # Draw grid
+        for r in range(1, 8):
+            cv2.line(display_board, (0, r * sq), (BOARD_SIZE, r * sq), (255, 0, 0), 1)
+            cv2.line(display_board, (r * sq, 0), (r * sq, BOARD_SIZE), (255, 0, 0), 1)
+        
+        # Mark clicked squares  
+        for _, _, x, y in clicked_samples:
+            cv2.circle(display_board, (x, y), 10, (0, 0, 255), -1)
+        
+        cv2.putText(display_board, f"Piece squares sampled: {len(clicked_samples)}", 
+                   (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
+        cv2.putText(display_board, "Click squares WITH pieces, SPACE when done", 
+                   (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+        
+        cv2.imshow("color_calib", display_board)
+        
+        key = cv2.waitKey(1) & 0xFF
+        if key == ord(' ') and len(clicked_samples) >= 3:
+            break
+        elif key == 27:  # ESC
+            cv2.destroyWindow("color_calib")
+            return None
+    
+    # Store piece colors
+    piece_colors = [color for _, color, _, _ in clicked_samples]
+    
+    cv2.destroyWindow("color_calib")
+    
+    # Calculate average colors and thresholds
+    avg_board_color = np.mean(board_colors, axis=0)
+    avg_piece_color = np.mean(piece_colors, axis=0)
+    
+    # Calculate color distance threshold
+    color_distances = []
+    for piece_color in piece_colors:
+        min_dist = min([np.linalg.norm(piece_color - board_color) for board_color in board_colors])
+        color_distances.append(min_dist)
+    
+    # Use 80% of the minimum distance as threshold
+    color_threshold = np.mean(color_distances) * 0.8
+    
+    print(f"\nCalibration Results:")
+    print(f"Average board color: RGB({avg_board_color[2]:.1f}, {avg_board_color[1]:.1f}, {avg_board_color[0]:.1f})")
+    print(f"Average piece color: RGB({avg_piece_color[2]:.1f}, {avg_piece_color[1]:.1f}, {avg_piece_color[0]:.1f})")
+    print(f"Color distance threshold: {color_threshold:.1f}")
+    
+    # Save calibration
+    calib_data = {
+        'board_colors': [c.tolist() for c in board_colors],
+        'piece_colors': [c.tolist() for c in piece_colors], 
+        'avg_board_color': avg_board_color.tolist(),
+        'avg_piece_color': avg_piece_color.tolist(),
+        'color_threshold': color_threshold
+    }
+    
+    try:
+        with open('piece_color_calib.json', 'w') as f:
+            json.dump(calib_data, f, indent=2)
+        print("Color calibration saved to piece_color_calib.json")
+    except Exception as e:
+        print(f"Failed to save color calibration: {e}")
+    
+    return calib_data
+
+def load_piece_color_calibration():
+    """Load piece color calibration if available"""
+    try:
+        with open('piece_color_calib.json', 'r') as f:
+            return json.load(f)
+    except FileNotFoundError:
+        return None
+    except Exception as e:
+        print(f"Error loading color calibration: {e}")
+        return None
+
+def is_occupied_color_based(square, color_calib=None):
+    """
+    Detect pieces based on color calibration
+    """
+    if square is None or square.size == 0 or color_calib is None:
+        return is_occupied(square)  # Fallback to original method
+    
+    # Get center area of square
+    center = center_crop(square, 0.3)
+    if center is None:
+        return False
+    
+    # Get average color
+    avg_color = np.mean(center.reshape(-1, 3), axis=0)
+    
+    # Calculate distance to board colors
+    board_colors = [np.array(c) for c in color_calib['board_colors']]
+    min_board_distance = min([np.linalg.norm(avg_color - board_color) for board_color in board_colors])
+    
+    # If distance is greater than threshold, it's likely a piece
+    threshold = color_calib['color_threshold']
+    is_piece = min_board_distance > threshold
+    
+    return is_piece
+
 def calibrate_empty_squares(rotated_board):
     """
     Calibrate detection by analyzing empty squares to establish baseline
@@ -313,67 +496,99 @@ def is_occupied(square):
     # Convert to different color spaces for analysis
     gray = cv2.cvtColor(square, cv2.COLOR_BGR2GRAY)
     hsv = cv2.cvtColor(square, cv2.COLOR_BGR2HSV)
+    lab = cv2.cvtColor(square, cv2.COLOR_BGR2LAB)
+    
+    # Get square dimensions for adaptive analysis
+    h, w = square.shape[:2]
+    center_crop_sq = square[h//4:3*h//4, w//4:3*w//4]  # Focus on center
+    
+    if center_crop_sq.size == 0:
+        return False
     
     # Method 1: Color variance - pieces should have more color variation
     color_variance = np.var(gray)
-    variance_occupied = color_variance > 50
+    variance_occupied = color_variance > 40  # Lowered threshold
     
     # Method 2: Edge detection - pieces have more defined edges
-    edges = cv2.Canny(gray, 30, 100)
+    edges = cv2.Canny(gray, 20, 80)  # Lower thresholds for better detection
     edge_density = np.sum(edges > 0) / edges.size
-    edge_occupied = edge_density > 0.015
+    edge_occupied = edge_density > 0.01  # Lowered threshold
     
-    # Method 3: Brightness analysis with adaptive threshold
-    mean_brightness = gray.mean()
-    brightness_occupied = mean_brightness < OCCUPANCY_THRESHOLD
+    # Method 3: Brightness analysis - adaptive to center vs edges
+    center_brightness = cv2.cvtColor(center_crop_sq, cv2.COLOR_BGR2GRAY).mean()
+    edge_brightness = gray.mean()
+    brightness_diff = abs(center_brightness - edge_brightness)
     
-    # Method 4: Color saturation - pieces often have different saturation than board
+    # If there's significant brightness difference between center and edges, likely a piece
+    brightness_occupied = brightness_diff > 10 or center_brightness < OCCUPANCY_THRESHOLD
+    
+    # Method 4: Color saturation analysis
     saturation = hsv[:,:,1].mean()
-    saturation_occupied = saturation > 30
+    center_saturation = cv2.cvtColor(center_crop_sq, cv2.COLOR_BGR2HSV)[:,:,1].mean()
+    saturation_occupied = saturation > 25 or center_saturation > 35
     
-    # Method 5: Histogram analysis - detect if there's a significant object
-    hist = cv2.calcHist([gray], [0], None, [256], [0, 256])
-    hist_peaks = len([i for i in range(1, 255) if hist[i] > hist[i-1] and hist[i] > hist[i+1]])
-    hist_occupied = hist_peaks > 2
+    # Method 5: LAB color space analysis (better for color detection)
+    lab_a = lab[:,:,1].mean()  # Green-Red component
+    lab_b = lab[:,:,2].mean()  # Blue-Yellow component
     
-    # Method 6: Color difference detection (new method for non-standard pieces)
-    # Check if the square has significantly different colors than expected board colors
-    # Get the dominant color
-    pixels = square.reshape((-1, 3))
-    mean_color = np.mean(pixels, axis=0)
+    # Check if colors deviate significantly from neutral (board colors)
+    lab_deviation = abs(lab_a - 128) + abs(lab_b - 128)
+    lab_occupied = lab_deviation > 15
     
-    # Typical chess board colors (you may need to adjust these)
-    light_square_color = np.array([240, 217, 181])  # Light wood/beige
-    dark_square_color = np.array([181, 136, 99])   # Dark wood/brown
+    # Method 6: Texture analysis using Local Binary Patterns concept
+    # Simple texture measure: standard deviation of local differences
+    gray_float = gray.astype(np.float32)
+    sobel_x = cv2.Sobel(gray_float, cv2.CV_32F, 1, 0, ksize=3)
+    sobel_y = cv2.Sobel(gray_float, cv2.CV_32F, 0, 1, ksize=3)
+    texture_measure = np.sqrt(sobel_x**2 + sobel_y**2).std()
+    texture_occupied = texture_measure > 8
     
-    # Calculate distance to typical board colors
-    dist_to_light = np.linalg.norm(mean_color - light_square_color)
-    dist_to_dark = np.linalg.norm(mean_color - dark_square_color)
-    min_board_dist = min(dist_to_light, dist_to_dark)
+    # Method 7: Histogram-based analysis
+    hist = cv2.calcHist([gray], [0], None, [32], [0, 256])  # Fewer bins for robustness
+    hist_normalized = hist / hist.sum()
+    hist_entropy = -np.sum(hist_normalized * np.log2(hist_normalized + 1e-10))
+    hist_occupied = hist_entropy > 3.0  # Higher entropy suggests more complex content
     
-    # If the color is significantly different from board colors, likely a piece
-    color_diff_occupied = min_board_dist > 50  # Adjust threshold as needed
+    # Method 8: Color clustering - check for multiple distinct colors
+    pixels = square.reshape((-1, 3)).astype(np.float32)
+    
+    # Simple k-means with k=2 to see if there are distinct color regions
+    try:
+        criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 10, 1.0)
+        _, labels, centers = cv2.kmeans(pixels, 2, None, criteria, 5, cv2.KMEANS_RANDOM_CENTERS)
+        
+        # If the two clusters are significantly different, likely a piece
+        color_distance = np.linalg.norm(centers[0] - centers[1])
+        cluster_occupied = color_distance > 30
+    except:
+        cluster_occupied = False
     
     # Combine all methods with weighted voting
-    votes = [
-        variance_occupied,
-        edge_occupied, 
-        brightness_occupied,
-        saturation_occupied,
-        hist_occupied,
-        color_diff_occupied
+    methods = [
+        (variance_occupied, 1.0),      # Color variance
+        (edge_occupied, 1.5),          # Edge detection (higher weight)
+        (brightness_occupied, 1.2),    # Brightness analysis
+        (saturation_occupied, 1.0),    # Saturation
+        (lab_occupied, 1.3),           # LAB color space (higher weight)
+        (texture_occupied, 1.1),       # Texture analysis
+        (hist_occupied, 0.8),          # Histogram entropy
+        (cluster_occupied, 1.4),       # Color clustering (higher weight)
     ]
     
-    # Require at least 3 out of 6 methods to agree (50% threshold)
-    vote_count = sum(votes)
-    is_piece_present = vote_count >= 3
+    # Calculate weighted vote
+    total_weight = sum(weight for _, weight in methods)
+    positive_weight = sum(weight for method, weight in methods if method)
+    confidence = positive_weight / total_weight
+    
+    # Require at least 55% confidence (adjustable)
+    is_piece_present = confidence >= 0.55
     
     # Debug output for calibration (uncomment to tune thresholds)
-    # if True:  # Set to True for debugging
-    #     print(f"Var:{color_variance:.1f}({variance_occupied}) Edge:{edge_density:.3f}({edge_occupied}) "
-    #           f"Bright:{mean_brightness:.1f}({brightness_occupied}) Sat:{saturation:.1f}({saturation_occupied}) "
-    #           f"Hist:{hist_peaks}({hist_occupied}) Color:{min_board_dist:.1f}({color_diff_occupied}) "
-    #           f"-> {vote_count}/6 = {is_piece_present}")
+    # print(f"Var:{color_variance:.1f}({variance_occupied}) Edge:{edge_density:.3f}({edge_occupied}) "
+    #       f"Bright:{brightness_diff:.1f}({brightness_occupied}) Sat:{saturation:.1f}({saturation_occupied}) "
+    #       f"LAB:{lab_deviation:.1f}({lab_occupied}) Texture:{texture_measure:.1f}({texture_occupied}) "
+    #       f"Hist:{hist_entropy:.1f}({hist_occupied}) Cluster:{cluster_occupied} "
+    #       f"-> Confidence: {confidence:.2f} = {is_piece_present}")
     
     return is_piece_present
 
@@ -397,6 +612,25 @@ def detect_board_state(warped_board):
             square_c = center_crop(square, CENTER_MARGIN)
             
             occupancy_matrix[r, c] = is_occupied(square_c)
+    
+    return occupancy_matrix
+
+def detect_board_state_color_based(warped_board, color_calib):
+    """Convert warped board image to occupancy matrix using color calibration"""
+    sq = BOARD_SIZE // 8
+    occupancy_matrix = np.zeros((8, 8), dtype=bool)
+    
+    for r in range(8):
+        for c in range(8):
+            x1 = c * sq
+            y1 = r * sq
+            x2 = x1 + sq
+            y2 = y1 + sq
+            
+            square = warped_board[y1:y2, x1:x2]
+            square_c = center_crop(square, CENTER_MARGIN)
+            
+            occupancy_matrix[r, c] = is_occupied_color_based(square_c, color_calib)
     
     return occupancy_matrix
 
@@ -615,18 +849,21 @@ def main():
     print("  N = New game")
     print("  R = Recalibrate board position")
     print("  T = Tune piece detection thresholds")
+    print("  P = Calibrate piece colors")
     print("  Q = Quit")
     print("")
     print("WORKFLOW:")
-    print("1. Press 'S' to get Stockfish suggestion")
-    print("2. Make the move on the physical board")
-    print("3. Press 'D' to enable move detection OR 'C' to confirm manually")
-    print("4. Robot will analyze and make its move")
+    print("1. First time setup: Press 'P' to calibrate piece/board colors")
+    print("2. Press 'S' to get Stockfish suggestion")
+    print("3. Make the move on the physical board")
+    print("4. Press 'D' to enable move detection OR 'C' to confirm manually")
+    print("5. Robot will analyze and make its move")
     print("")
     print("CALIBRATION:")
-    print("- If pieces aren't detected, press 'T' to tune thresholds")
-    print("- Set up the starting position first, then press 'T'")
-    print("- The system will ask which squares are occupied")
+    print("- If pieces aren't detected, press 'P' to calibrate colors")
+    print("- Set up the starting position first, then press 'P'")
+    print("- Click empty squares first, then squares with pieces")
+    print("- If still having issues, press 'T' to tune thresholds")
     print("")
 
     # Initialize chess board and state tracking
@@ -634,13 +871,19 @@ def main():
     last_suggestion = None
     last_analysis = None
     move_counter = 0
-    
     # Track board state for move detection
     previous_occupancy = get_expected_starting_occupancy()
     human_to_move = True  # Human goes first
     move_detection_active = False
     stable_frame_count = 0
     required_stable_frames = 30  # Require 30 stable frames before detecting move
+    
+    # Load color calibration if available
+    color_calib = load_piece_color_calibration()
+    if color_calib:
+        print("Loaded color calibration from piece_color_calib.json")
+    else:
+        print("No color calibration found - you can create one with 'P'")
     
     print(f"Game started! Expected starting position:")
     print(f"Human (White) to move first")
@@ -661,8 +904,11 @@ def main():
         warped_top = warp_board(top_view, calib["points"])
         rotated_board = rotate_board(warped_top)
         
-        # Detect current board occupancy
-        occupancy_matrix = detect_board_state(rotated_board)
+        # Detect current board occupancy using color calibration if available
+        if color_calib:
+            occupancy_matrix = detect_board_state_color_based(rotated_board, color_calib)
+        else:
+            occupancy_matrix = detect_board_state(rotated_board)
 
         # Move detection logic
         detected_move = None
@@ -907,15 +1153,34 @@ def main():
                 print(f"Suggested OCCUPANCY_THRESHOLD: {optimal_brightness:.1f}")
                 print(f"Current threshold: {OCCUPANCY_THRESHOLD}")
                 
-                # Update global threshold
-                global OCCUPANCY_THRESHOLD
+                # Update threshold
                 new_threshold = input(f"Enter new threshold (current={OCCUPANCY_THRESHOLD}): ")
                 if new_threshold.strip():
                     try:
-                        OCCUPANCY_THRESHOLD = float(new_threshold)
+                        globals()['OCCUPANCY_THRESHOLD'] = float(new_threshold)
                         print(f"Updated threshold to {OCCUPANCY_THRESHOLD}")
                     except ValueError:
                         print("Invalid threshold value")
+        elif key == ord('p'):
+            print("\nCalibrating piece colors...")
+            print("Set up the board with pieces in starting position first!")
+            input("Press ENTER when ready...")
+            
+            # Use current rotated board for color calibration
+            with frame_lock:
+                if frames[1] is not None:
+                    calibration_frame = frames[1].copy()
+                    warped_calib = warp_board(calibration_frame, calib["points"])
+                    rotated_calib = rotate_board(warped_calib)
+                    
+                    new_color_calib = calibrate_piece_colors(rotated_calib)
+                    if new_color_calib:
+                        color_calib = new_color_calib
+                        print("Color calibration updated!")
+                    else:
+                        print("Color calibration cancelled")
+                else:
+                    print("No camera frame available")
         elif key == ord('s'):
             print("\nGetting Stockfish suggestion...")
             last_suggestion = get_stockfish_move(current_board)
