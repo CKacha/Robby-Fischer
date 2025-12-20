@@ -232,31 +232,150 @@ def center_crop(img, margin):
         return None
     return img[dy:h-dy, dx:w-dx]
 
-def is_occupied(square):
+def calibrate_empty_squares(rotated_board):
     """
-    Improved piece detection that works with non-standard pieces
-    Uses multiple methods: brightness, edge detection, and variance
+    Calibrate detection by analyzing empty squares to establish baseline
+    """
+    print("Calibrating with empty board...")
+    print("Please ensure the board is completely empty, then press ENTER")
+    input()
+    
+    sq = BOARD_SIZE // 8
+    empty_baselines = {}
+    
+    for r in range(8):
+        for c in range(8):
+            x1 = c * sq
+            y1 = r * sq
+            x2 = x1 + sq
+            y2 = y1 + sq
+            
+            square = rotated_board[y1:y2, x1:x2]
+            square_c = center_crop(square, CENTER_MARGIN)
+            
+            if square_c is not None:
+                gray = cv2.cvtColor(square_c, cv2.COLOR_BGR2GRAY)
+                hsv = cv2.cvtColor(square_c, cv2.COLOR_BGR2HSV)
+                
+                baseline = {
+                    'brightness': gray.mean(),
+                    'variance': np.var(gray),
+                    'saturation': hsv[:,:,1].mean(),
+                }
+                
+                file_char = chr(ord('a') + c)
+                rank_char = str(8 - r)
+                square_name = f"{file_char}{rank_char}"
+                empty_baselines[square_name] = baseline
+                
+    return empty_baselines
+
+def is_occupied_with_baseline(square, baseline=None, threshold_multiplier=1.5):
+    """
+    Improved piece detection using baseline comparison
     """
     if square is None or square.size == 0:
         return False
     
-    # Convert to grayscale
+    # Convert to different color spaces for analysis
     gray = cv2.cvtColor(square, cv2.COLOR_BGR2GRAY)
+    hsv = cv2.cvtColor(square, cv2.COLOR_BGR2HSV)
     
-    # Method 1: Basic brightness threshold
-    brightness_occupied = gray.mean() < OCCUPANCY_THRESHOLD
+    current_brightness = gray.mean()
+    current_variance = np.var(gray)
+    current_saturation = hsv[:,:,1].mean()
     
-    # Method 2: Edge detection - pieces have more edges than empty squares
-    edges = cv2.Canny(gray, 50, 150)
+    if baseline is not None:
+        # Compare against baseline (empty square)
+        brightness_diff = abs(current_brightness - baseline['brightness'])
+        variance_diff = abs(current_variance - baseline['variance'])
+        saturation_diff = abs(current_saturation - baseline['saturation'])
+        
+        # Thresholds based on baseline
+        brightness_occupied = brightness_diff > (baseline['brightness'] * 0.1)  # 10% change
+        variance_occupied = variance_diff > (baseline['variance'] * 0.5)  # 50% change
+        saturation_occupied = saturation_diff > 15  # Absolute change
+        
+        votes = [brightness_occupied, variance_occupied, saturation_occupied]
+        return sum(votes) >= 2
+    else:
+        # Fallback to original method
+        return is_occupied(square)
+
+def is_occupied(square):
+    """
+    Enhanced piece detection using color differences and multiple detection methods
+    Assumes pieces have different color than the board squares
+    """
+    if square is None or square.size == 0:
+        return False
+    
+    # Convert to different color spaces for analysis
+    gray = cv2.cvtColor(square, cv2.COLOR_BGR2GRAY)
+    hsv = cv2.cvtColor(square, cv2.COLOR_BGR2HSV)
+    
+    # Method 1: Color variance - pieces should have more color variation
+    color_variance = np.var(gray)
+    variance_occupied = color_variance > 50
+    
+    # Method 2: Edge detection - pieces have more defined edges
+    edges = cv2.Canny(gray, 30, 100)
     edge_density = np.sum(edges > 0) / edges.size
-    edge_occupied = edge_density > 0.02  # Adjust threshold as needed
+    edge_occupied = edge_density > 0.015
     
-    # Method 3: Variance - pieces create more texture variance
-    variance_occupied = np.var(gray) > 100  # Adjust threshold as needed
+    # Method 3: Brightness analysis with adaptive threshold
+    mean_brightness = gray.mean()
+    brightness_occupied = mean_brightness < OCCUPANCY_THRESHOLD
     
-    # Combine methods: if any two methods agree, consider it occupied
-    vote_count = sum([brightness_occupied, edge_occupied, variance_occupied])
-    return vote_count >= 2
+    # Method 4: Color saturation - pieces often have different saturation than board
+    saturation = hsv[:,:,1].mean()
+    saturation_occupied = saturation > 30
+    
+    # Method 5: Histogram analysis - detect if there's a significant object
+    hist = cv2.calcHist([gray], [0], None, [256], [0, 256])
+    hist_peaks = len([i for i in range(1, 255) if hist[i] > hist[i-1] and hist[i] > hist[i+1]])
+    hist_occupied = hist_peaks > 2
+    
+    # Method 6: Color difference detection (new method for non-standard pieces)
+    # Check if the square has significantly different colors than expected board colors
+    # Get the dominant color
+    pixels = square.reshape((-1, 3))
+    mean_color = np.mean(pixels, axis=0)
+    
+    # Typical chess board colors (you may need to adjust these)
+    light_square_color = np.array([240, 217, 181])  # Light wood/beige
+    dark_square_color = np.array([181, 136, 99])   # Dark wood/brown
+    
+    # Calculate distance to typical board colors
+    dist_to_light = np.linalg.norm(mean_color - light_square_color)
+    dist_to_dark = np.linalg.norm(mean_color - dark_square_color)
+    min_board_dist = min(dist_to_light, dist_to_dark)
+    
+    # If the color is significantly different from board colors, likely a piece
+    color_diff_occupied = min_board_dist > 50  # Adjust threshold as needed
+    
+    # Combine all methods with weighted voting
+    votes = [
+        variance_occupied,
+        edge_occupied, 
+        brightness_occupied,
+        saturation_occupied,
+        hist_occupied,
+        color_diff_occupied
+    ]
+    
+    # Require at least 3 out of 6 methods to agree (50% threshold)
+    vote_count = sum(votes)
+    is_piece_present = vote_count >= 3
+    
+    # Debug output for calibration (uncomment to tune thresholds)
+    # if True:  # Set to True for debugging
+    #     print(f"Var:{color_variance:.1f}({variance_occupied}) Edge:{edge_density:.3f}({edge_occupied}) "
+    #           f"Bright:{mean_brightness:.1f}({brightness_occupied}) Sat:{saturation:.1f}({saturation_occupied}) "
+    #           f"Hist:{hist_peaks}({hist_occupied}) Color:{min_board_dist:.1f}({color_diff_occupied}) "
+    #           f"-> {vote_count}/6 = {is_piece_present}")
+    
+    return is_piece_present
 
 # =========================
 # CHESS BOARD STATE DETECTION
@@ -494,6 +613,8 @@ def main():
     print("  A = Get suggested move for human")
     print("  C = Confirm move after executing it")
     print("  N = New game")
+    print("  R = Recalibrate board position")
+    print("  T = Tune piece detection thresholds")
     print("  Q = Quit")
     print("")
     print("WORKFLOW:")
@@ -501,6 +622,11 @@ def main():
     print("2. Make the move on the physical board")
     print("3. Press 'D' to enable move detection OR 'C' to confirm manually")
     print("4. Robot will analyze and make its move")
+    print("")
+    print("CALIBRATION:")
+    print("- If pieces aren't detected, press 'T' to tune thresholds")
+    print("- Set up the starting position first, then press 'T'")
+    print("- The system will ask which squares are occupied")
     print("")
 
     # Initialize chess board and state tracking
@@ -634,7 +760,7 @@ def main():
             def chess_to_coords(square_name):
                 file_idx = ord(square_name[0]) - ord('a')  # a=0, b=1, etc.
                 rank_idx = 8 - int(square_name[1])  # 8=0, 7=1, etc. (flipped)
-                return file_idx, rank_idx, file_idx, rank_idx
+                return file_idx, rank_idx
             
             from_c, from_r = chess_to_coords(from_square)
             to_c, to_r = chess_to_coords(to_square)
@@ -722,11 +848,74 @@ def main():
         if key == ord('q'):
             break
         elif key == ord('r'):
-            print("\nRecalibrating...\n")
+            print("\nRecalibrating board position...\n")
             # Use the live threaded frames for recalibration
             calib = calibrate_with_frame_source(frames, "frames")
             if calib is None:
                 print("Recalibration failed, continuing with old calibration")
+        elif key == ord('t'):
+            print("\nTuning piece detection thresholds...")
+            # Enable debug output for threshold tuning
+            print("Analyzing current board state for threshold calibration...")
+            sq = BOARD_SIZE // 8
+            
+            occupied_squares = []
+            empty_squares = []
+            
+            for r in range(8):
+                for c in range(8):
+                    x1 = c * sq
+                    y1 = r * sq
+                    x2 = x1 + sq
+                    y2 = y1 + sq
+                    
+                    square = rotated_board[y1:y2, x1:x2]
+                    square_c = center_crop(square, CENTER_MARGIN)
+                    
+                    if square_c is not None:
+                        gray = cv2.cvtColor(square_c, cv2.COLOR_BGR2GRAY)
+                        hsv = cv2.cvtColor(square_c, cv2.COLOR_BGR2HSV)
+                        
+                        brightness = gray.mean()
+                        variance = np.var(gray)
+                        saturation = hsv[:,:,1].mean()
+                        
+                        edges = cv2.Canny(gray, 30, 100)
+                        edge_density = np.sum(edges > 0) / edges.size
+                        
+                        file_char = chr(ord('a') + c)
+                        rank_char = str(8 - r)
+                        square_name = f"{file_char}{rank_char}"
+                        
+                        print(f"{square_name}: Brightness={brightness:.1f}, Variance={variance:.1f}, "
+                              f"Edge={edge_density:.3f}, Saturation={saturation:.1f}")
+                        
+                        # Ask user if this square is occupied
+                        user_input = input(f"Is {square_name} occupied? (y/n/skip): ").lower()
+                        if user_input == 'y':
+                            occupied_squares.append((brightness, variance, edge_density, saturation))
+                        elif user_input == 'n':
+                            empty_squares.append((brightness, variance, edge_density, saturation))
+            
+            if occupied_squares and empty_squares:
+                print("\nAnalyzing optimal thresholds...")
+                # Calculate optimal thresholds
+                occ_brightness = [x[0] for x in occupied_squares]
+                empty_brightness = [x[0] for x in empty_squares]
+                
+                optimal_brightness = (max(occ_brightness) + min(empty_brightness)) / 2
+                print(f"Suggested OCCUPANCY_THRESHOLD: {optimal_brightness:.1f}")
+                print(f"Current threshold: {OCCUPANCY_THRESHOLD}")
+                
+                # Update global threshold
+                global OCCUPANCY_THRESHOLD
+                new_threshold = input(f"Enter new threshold (current={OCCUPANCY_THRESHOLD}): ")
+                if new_threshold.strip():
+                    try:
+                        OCCUPANCY_THRESHOLD = float(new_threshold)
+                        print(f"Updated threshold to {OCCUPANCY_THRESHOLD}")
+                    except ValueError:
+                        print("Invalid threshold value")
         elif key == ord('s'):
             print("\nGetting Stockfish suggestion...")
             last_suggestion = get_stockfish_move(current_board)
