@@ -5,7 +5,7 @@ import os
 import chess
 import chess.engine
 import threading
-import time  # Importing the missing time module
+import time
 
 # =========================
 # CONFIG
@@ -14,7 +14,7 @@ import time  # Importing the missing time module
 CAMERA_INDEXES = [4, 6, 3]  # wrist(2), top(6), side(3) - based on camera.txt
 CALIB_FILE = "board_calib_4pt.json"
 BOARD_SIZE = 800  # The warped board will be BOARD_SIZE x BOARD_SIZE
-OCCUPANCY_THRESHOLD = 140
+OCCUPANCY_THRESHOLD = 120  # Adjusted for better detection - lower = more sensitive
 CENTER_MARGIN = 0.25
 FRAME_WIDTH = 640  # Resolution for FPS
 FRAME_HEIGHT = 480
@@ -233,10 +233,30 @@ def center_crop(img, margin):
     return img[dy:h-dy, dx:w-dx]
 
 def is_occupied(square):
+    """
+    Improved piece detection that works with non-standard pieces
+    Uses multiple methods: brightness, edge detection, and variance
+    """
     if square is None or square.size == 0:
         return False
+    
+    # Convert to grayscale
     gray = cv2.cvtColor(square, cv2.COLOR_BGR2GRAY)
-    return gray.mean() < OCCUPANCY_THRESHOLD
+    
+    # Method 1: Basic brightness threshold
+    brightness_occupied = gray.mean() < OCCUPANCY_THRESHOLD
+    
+    # Method 2: Edge detection - pieces have more edges than empty squares
+    edges = cv2.Canny(gray, 50, 150)
+    edge_density = np.sum(edges > 0) / edges.size
+    edge_occupied = edge_density > 0.02  # Adjust threshold as needed
+    
+    # Method 3: Variance - pieces create more texture variance
+    variance_occupied = np.var(gray) > 100  # Adjust threshold as needed
+    
+    # Combine methods: if any two methods agree, consider it occupied
+    vote_count = sum([brightness_occupied, edge_occupied, variance_occupied])
+    return vote_count >= 2
 
 # =========================
 # CHESS BOARD STATE DETECTION
@@ -260,6 +280,72 @@ def detect_board_state(warped_board):
             occupancy_matrix[r, c] = is_occupied(square_c)
     
     return occupancy_matrix
+
+def detect_move_from_occupancy_change(prev_occupancy, curr_occupancy):
+    """Detect chess move by comparing occupancy matrices"""
+    differences = prev_occupancy != curr_occupancy
+    
+    # Find squares that changed
+    changed_squares = []
+    for r in range(8):
+        for c in range(8):
+            if differences[r, c]:
+                file_char = chr(ord('a') + c)
+                rank_char = str(8 - r)
+                square_name = f"{file_char}{rank_char}"
+                was_occupied = prev_occupancy[r, c]
+                is_occupied = curr_occupancy[r, c]
+                changed_squares.append((square_name, was_occupied, is_occupied))
+    
+    # Simple move detection: one square emptied, one filled
+    if len(changed_squares) == 2:
+        from_square = None
+        to_square = None
+        
+        for square, was_occupied, is_occupied in changed_squares:
+            if was_occupied and not is_occupied:  # Square became empty
+                from_square = square
+            elif not was_occupied and is_occupied:  # Square became occupied
+                to_square = square
+        
+        if from_square and to_square:
+            return f"{from_square}{to_square}"
+    
+    # Handle castling (king + rook move)
+    elif len(changed_squares) == 4:
+        # This could be castling - more complex logic needed
+        pass
+    
+    return None
+
+def get_board_occupancy_from_chess_board(board):
+    """Generate expected occupancy matrix from current chess board state"""
+    occupancy = np.zeros((8, 8), dtype=bool)
+    
+    for square in chess.SQUARES:
+        piece = board.piece_at(square)
+        if piece:
+            # Convert chess square to matrix coordinates
+            file_idx = chess.square_file(square)  # 0-7 (a-h)
+            rank_idx = 7 - chess.square_rank(square)  # 0-7 (8-1, flipped for display)
+            occupancy[rank_idx, file_idx] = True
+    
+    return occupancy
+
+def get_expected_starting_occupancy():
+    """Return the occupancy matrix for standard chess starting position"""
+    occupancy = np.zeros((8, 8), dtype=bool)
+    
+    # Rank 1 (white pieces)
+    occupancy[7, :] = True  # Bottom row (rank 1)
+    # Rank 2 (white pawns)  
+    occupancy[6, :] = True  # Second from bottom (rank 2)
+    # Rank 7 (black pawns)
+    occupancy[1, :] = True  # Second from top (rank 7)
+    # Rank 8 (black pieces)
+    occupancy[0, :] = True  # Top row (rank 8)
+    
+    return occupancy
 
 def occupancy_to_fen(occupancy_matrix, reference_board=None):
     """Convert occupancy matrix to FEN notation
@@ -401,17 +487,38 @@ def main():
     cv2.resizeWindow("analysis", 400, 600)
 
     print("\nRUNNING")
-    print("R = recalibrate")
-    print("S = get Stockfish suggestion")
-    print("M = make a move (enter in format: e2e4)")
-    print("N = new game")
-    print("Q = quit\n")
+    print("Controls:")
+    print("  S = Get Stockfish suggestion")
+    print("  M = Make manual move")
+    print("  D = Toggle automatic move detection") 
+    print("  A = Get suggested move for human")
+    print("  C = Confirm move after executing it")
+    print("  N = New game")
+    print("  Q = Quit")
+    print("")
+    print("WORKFLOW:")
+    print("1. Press 'S' to get Stockfish suggestion")
+    print("2. Make the move on the physical board")
+    print("3. Press 'D' to enable move detection OR 'C' to confirm manually")
+    print("4. Robot will analyze and make its move")
+    print("")
 
-    # Initialize chess board
+    # Initialize chess board and state tracking
     current_board = chess.Board()
     last_suggestion = None
     last_analysis = None
     move_counter = 0
+    
+    # Track board state for move detection
+    previous_occupancy = get_expected_starting_occupancy()
+    human_to_move = True  # Human goes first
+    move_detection_active = False
+    stable_frame_count = 0
+    required_stable_frames = 30  # Require 30 stable frames before detecting move
+    
+    print(f"Game started! Expected starting position:")
+    print(f"Human (White) to move first")
+    print(f"Robot will play as Black")
 
     while True:
         # Lock frames to avoid concurrent access issues
@@ -430,6 +537,61 @@ def main():
         
         # Detect current board occupancy
         occupancy_matrix = detect_board_state(rotated_board)
+
+        # Move detection logic
+        detected_move = None
+        if move_detection_active:
+            # Check if current occupancy is stable for required frames
+            if np.array_equal(occupancy_matrix, previous_occupancy):
+                stable_frame_count = 0  # Reset if no change
+            else:
+                # Check if occupancy is consistent with a single move
+                detected_move = detect_move_from_occupancy_change(previous_occupancy, occupancy_matrix)
+                if detected_move:
+                    stable_frame_count += 1
+                    if stable_frame_count >= required_stable_frames:
+                        # Move detected! Apply it to the board
+                        try:
+                            move = chess.Move.from_uci(detected_move)
+                            if move in current_board.legal_moves:
+                                current_board.push(move)
+                                move_counter += 1
+                                print(f"Detected human move: {detected_move}")
+                                
+                                # Update tracking state
+                                previous_occupancy = occupancy_matrix.copy()
+                                
+                                # Get robot response
+                                if not current_board.is_game_over():
+                                    robot_move = get_stockfish_move(current_board)
+                                    if robot_move:
+                                        print(f"Robot plays: {robot_move}")
+                                        current_board.push(robot_move)
+                                        move_counter += 1
+                                        
+                                        # TODO: Send robot_move to robot arm controller
+                                        print("TODO: Execute robot move with arm")
+                                        
+                                        # Update expected occupancy after robot move
+                                        # For now, we'll wait for visual confirmation
+                                        human_to_move = True
+                                        move_detection_active = False
+                                        
+                                        # Get new analysis
+                                        last_suggestion = get_stockfish_move(current_board)
+                                        last_analysis = analyze_position(current_board)
+                                else:
+                                    print("Game Over!")
+                                
+                                stable_frame_count = 0
+                            else:
+                                print(f"Detected illegal move: {detected_move}")
+                                stable_frame_count = 0
+                        except:
+                            print(f"Invalid move format: {detected_move}")
+                            stable_frame_count = 0
+                else:
+                    stable_frame_count = 0
 
         sq = BOARD_SIZE // 8
         
@@ -472,7 +634,7 @@ def main():
             def chess_to_coords(square_name):
                 file_idx = ord(square_name[0]) - ord('a')  # a=0, b=1, etc.
                 rank_idx = 8 - int(square_name[1])  # 8=0, 7=1, etc. (flipped)
-                return file_idx, rank_idx
+                return file_idx, rank_idx file_idx, rank_idx
             
             from_c, from_r = chess_to_coords(from_square)
             to_c, to_r = chess_to_coords(to_square)
@@ -545,12 +707,13 @@ def main():
         # Instructions
         cv2.putText(analysis_img, "Controls:", (10, 520), 
                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (100, 255, 100), 2)
-        cv2.putText(analysis_img, "S = Stockfish suggestion", (10, 545), 
+        cv2.putText(analysis_img, "S = Suggestion | M = Manual move", (10, 545), 
                    cv2.FONT_HERSHEY_SIMPLEX, 0.4, (100, 255, 100), 1)
-        cv2.putText(analysis_img, "M = Make move", (10, 565), 
+        cv2.putText(analysis_img, "D = Toggle move detect | N = New game", (10, 565), 
                    cv2.FONT_HERSHEY_SIMPLEX, 0.4, (100, 255, 100), 1)
-        cv2.putText(analysis_img, "N = New game", (10, 585), 
-                   cv2.FONT_HERSHEY_SIMPLEX, 0.4, (100, 255, 100), 1)
+        cv2.putText(analysis_img, f"Move detection: {'ON' if move_detection_active else 'OFF'}", 
+                   (10, 585), cv2.FONT_HERSHEY_SIMPLEX, 0.4, 
+                   (0, 255, 0) if move_detection_active else (255, 0, 0), 1)
         
         cv2.imshow("analysis", analysis_img)
 
@@ -581,6 +744,11 @@ def main():
                     current_board.push(move)
                     move_counter += 1
                     print(f"Move {move_input} played!")
+                    
+                    # Update expected board state after manual move
+                    # For simplicity, we'll assume the physical board matches the game state
+                    previous_occupancy = get_board_occupancy_from_chess_board(current_board)
+                    
                     # Get new suggestion after move
                     last_suggestion = get_stockfish_move(current_board)
                     last_analysis = analyze_position(current_board)
@@ -594,6 +762,53 @@ def main():
             move_counter = 0
             last_suggestion = None
             last_analysis = None
+            previous_occupancy = get_expected_starting_occupancy()
+            human_to_move = True
+            move_detection_active = False
+            stable_frame_count = 0
+        elif key == ord('d'):
+            # Toggle move detection
+            move_detection_active = not move_detection_active
+            print(f"Move detection: {'ON' if move_detection_active else 'OFF'}")
+            if move_detection_active:
+                print("Waiting for human move...")
+        elif key == ord('a'):
+            # Auto-play mode: get Stockfish suggestion and execute
+            if current_board.turn:  # White's turn
+                print("Getting human move suggestion...")
+                suggested_move = get_stockfish_move(current_board)
+                if suggested_move:
+                    print(f"Suggested move for human: {suggested_move}")
+                    print("Execute this move on the board, then press 'c' to confirm")
+                    last_suggestion = suggested_move
+        elif key == ord('c'):
+            # Confirm that a suggested move has been executed
+            if last_suggestion and current_board.turn:
+                print(f"Confirming human move: {last_suggestion}")
+                current_board.push(last_suggestion)
+                move_counter += 1
+                
+                # Update expected board state
+                previous_occupancy = get_board_occupancy_from_chess_board(current_board)
+                
+                # Get robot response
+                if not current_board.is_game_over():
+                    robot_move = get_stockfish_move(current_board)
+                    if robot_move:
+                        print(f"Robot plays: {robot_move}")
+                        current_board.push(robot_move)
+                        move_counter += 1
+                        
+                        # TODO: Send robot_move to robot arm controller
+                        print("TODO: Execute robot move with arm")
+                        
+                        # Update for next human turn
+                        last_suggestion = get_stockfish_move(current_board)
+                        last_analysis = analyze_position(current_board)
+                else:
+                    print("Game Over!")
+            else:
+                print("No move to confirm or not human's turn")
 
     # Stop capture threads
     stop_capture = True
