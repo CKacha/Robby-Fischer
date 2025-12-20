@@ -1,0 +1,6 @@
+(base) bor3d@bor3d:~/Documents/GitHub/ChessArm$ python testc.py
+  File "/home/bor3d/Documents/GitHub/ChessArm/testc.py", line 637
+    return file_idx, rank_idx file_idx, rank_idx
+                              ^^^^^^^^
+SyntaxError: invalid syntax
+(base) bor3d@bor3d:~/Documents/GitHub/ChessArm$ 
