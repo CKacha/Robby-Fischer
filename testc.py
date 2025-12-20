@@ -634,7 +634,7 @@ def main():
             def chess_to_coords(square_name):
                 file_idx = ord(square_name[0]) - ord('a')  # a=0, b=1, etc.
                 rank_idx = 8 - int(square_name[1])  # 8=0, 7=1, etc. (flipped)
-                return file_idx, rank_idx file_idx, rank_idx
+                return file_idx, rank_idx, file_idx, rank_idx
             
             from_c, from_r = chess_to_coords(from_square)
             to_c, to_r = chess_to_coords(to_square)
