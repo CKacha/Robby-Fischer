@@ -11,15 +11,8 @@ data and weights for training models
 sotckfish 
 differnt languages of code for whatnot
 
-
-every single move piece in general will be recorded by our motion and create 
-a pretrained model for it 
-for example:
-    take piece off model 
-    move pawn piece front 1
-    move knight right 
-    move knight left 
-    and more 
+training model will be for moving pieces, we will use algorithsm/kinematics for movieng pieces 
+the chessboard is 8 inches by 8 inches, with pieces a bit smalller than that 
 
 FLOW:
 camera starts recording 
@@ -33,9 +26,5 @@ program changes image data to a move(like 1dx6 or whatnot)
 sends that data to stockfish, and stockfish will have a record on what has happened so far
 stockfish returns data in what piece needs to be moved where to the program
 program will find the best way to move that piece 
-based on previously trrained models(we will do this here) the program will send these to the robot arm to move 
-    for example, move knight to the right side and get rid of a pawn
-    get take piece off board motion to take off that pawn 
-    use move knight to right motion to that place
-    then return to base spot and wait
+based on algorithms and models it will move pieces 
 camera records 
