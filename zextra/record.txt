@@ -42,4 +42,4 @@ when we start the game take a pic
 when we start our turn we take a pic 
 something/somewhat to find out what pice moved, send that to stockfish 
 stockfish gives us a best move 
-then we will have arm moving
+then we will have arm movings
