@@ -1,0 +1,7 @@
+numpy
+opencv-python
+python-chess
+pyyaml
+rich
+tqdm
+pyserial

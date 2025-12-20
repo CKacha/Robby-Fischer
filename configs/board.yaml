@@ -1,0 +1,12 @@
+# Board is assumed to be viewed from White's perspective (a1 bottom-left).
+# If your camera is flipped/rotated, you’ll handle that in vision/rectify.py.
+white_bottom: true
+
+# Stability detection: require K identical FEN readings before accepting a change.
+stable_k: 6
+
+# (Optional) ArUco config if you add markers:
+aruco:
+  enabled: false
+  dictionary: "DICT_4X4_50"
+  marker_length_mm: 20

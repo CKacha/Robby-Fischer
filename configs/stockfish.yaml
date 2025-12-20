@@ -1,0 +1,4 @@
+engine_path: "stockfish"
+threads: 2
+hash_mb: 128
+move_time_ms: 250
