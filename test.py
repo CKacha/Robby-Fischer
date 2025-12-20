@@ -4,29 +4,18 @@ import json
 import os
 import chess
 import chess.engine
-import threading
-import time  # Importing the missing time module
-
-# =========================
-# CONFIG
-# =========================
+import time
 
 CAMERA_INDEXES = [4, 6, 3]  # wrist(4), top(6), side(3)
 CALIB_FILE = "board_calib_4pt.json"
-BOARD_SIZE = 800  # The warped board will be BOARD_SIZE x BOARD_SIZE
+BOARD_SIZE = 800  
 OCCUPANCY_THRESHOLD = 140
 CENTER_MARGIN = 0.25
-FRAME_WIDTH = 640  # Resolution for FPS
+FRAME_WIDTH = 640
 FRAME_HEIGHT = 480
-FPS = 30  # Set the frame rate to 30 FPS for each camera
-
-# =========================
-# GLOBALS
-# =========================
+FPS = 30
 
 clicked_points = []
-frame_lock = threading.Lock()  # To avoid race conditions when accessing frames
-frames = [None, None, None]  # To hold frames from the cameras
 
 # =========================
 # CALIBRATION
@@ -99,9 +88,6 @@ def warp_board(frame, pts):
     warped = cv2.warpPerspective(frame, M, (BOARD_SIZE, BOARD_SIZE))
     return warped
 
-def rotate_board(warped_board):
-    return cv2.rotate(warped_board, cv2.ROTATE_90_COUNTERCLOCKWISE)
-
 def center_crop(img, margin):
     h, w = img.shape[:2]
     dx = int(w * margin)
@@ -126,49 +112,19 @@ def get_stockfish_move(current_board):
         return result.move
 
 # =========================
-# THREADING FOR CAMERA CAPTURE
-# =========================
-
-def capture_frames(camera_idx, frame_array):
-    cap = cv2.VideoCapture(camera_idx)
-    cap.set(cv2.CAP_PROP_FRAME_WIDTH, FRAME_WIDTH)
-    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, FRAME_HEIGHT)
-    cap.set(cv2.CAP_PROP_FPS, FPS)
-
-    while True:
-        ret, frame = cap.read()
-        if ret:
-            with frame_lock:
-                frame_array[camera_idx] = frame
-        else:
-            print(f"Error capturing frame from camera {camera_idx}")
-            break
-
-    cap.release()
-
-# =========================
 # MAIN
 # =========================
 
 def main():
-    # Initialize the frames array
-    frames = [None] * len(CAMERA_INDEXES)
-    
-    # Start the camera capture threads
-    threads = []
-    for i, camera_idx in enumerate(CAMERA_INDEXES):
-        thread = threading.Thread(target=capture_frames, args=(i, frames))
-        threads.append(thread)
-        thread.start()
+    # Open all cameras
+    caps = [cv2.VideoCapture(idx) for idx in CAMERA_INDEXES]
+    if not all([cap.isOpened() for cap in caps]):
+        raise RuntimeError("Could not open one or more cameras")
 
-    # Wait for the threads to initialize
-    time.sleep(2)  # Sleep a bit to ensure threads are capturing frames
-
-    # Load calibration or calibrate
     if os.path.exists(CALIB_FILE):
         calib = load_calibration()
     else:
-        calib = calibrate(cv2.VideoCapture(CAMERA_INDEXES[1]))  # Use the top camera for calibration
+        calib = calibrate(caps[0])
 
     cv2.namedWindow("board", cv2.WINDOW_NORMAL)
     cv2.resizeWindow("board", 900, 900)
@@ -181,53 +137,77 @@ def main():
     current_board = chess.Board()
 
     while True:
-        # Lock frames to avoid concurrent access issues
-        with frame_lock:
-            # Check if any frame is None
-            if any(frame is None for frame in frames):
-                continue
+        # Capture frames from all cameras
+        frames = [cap.read()[1] for cap in caps]
 
-            top_view = frames[1]
-            side_view = frames[2]
-            wrist_view = frames[0]
+        if any(frame is None for frame in frames):
+            continue
 
-            # Process the top view for chess detection
-            warped_top = warp_board(top_view, calib["points"])
-            rotated_board = rotate_board(warped_top)
+        # Process top-down view for chess detection (index 1 is the top camera)
+        warped = warp_board(frames[1], calib["points"])
+        sq = BOARD_SIZE // 8
 
-            sq = BOARD_SIZE // 8
-            for r in range(1, 8):
-                cv2.line(rotated_board, (0, r * sq), (BOARD_SIZE, r * sq), (255, 0, 0), 2)
-                cv2.line(rotated_board, (r * sq, 0), (r * sq, BOARD_SIZE), (255, 0, 0), 2)
-
-            # Add labels on the rotated board
-            for r in range(8):
-                cv2.putText(rotated_board, str(8 - r), (5, r * sq + 15), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+        # Loop through all squares and check occupancy
+        for r in range(8):
             for c in range(8):
-                cv2.putText(rotated_board, chr(ord('a') + c), (c * sq + 15, BOARD_SIZE - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+                x1 = c * sq
+                y1 = r * sq
+                x2 = x1 + sq
+                y2 = y1 + sq
 
-            # Display the warped, rotated board
-            cv2.imshow("board", rotated_board)
+                square = warped[y1:y2, x1:x2]
+                square_c = center_crop(square, CENTER_MARGIN)
 
-        # Show all camera views stacked horizontally
-        top_view_resized = cv2.resize(top_view, (300, 300))
-        side_view_resized = cv2.resize(side_view, (300, 300))
-        wrist_view_resized = cv2.resize(wrist_view, (300, 300))
+                occ = is_occupied(square_c)
 
-        combined_view = np.hstack((top_view_resized, side_view_resized, wrist_view_resized))
+                color = (0, 0, 255) if occ else (0, 255, 0)
+                cv2.rectangle(warped, (x1, y1), (x2, y2), color, 1)
+
+                # Chess coordinates
+                file_char = chr(ord('a') + c)
+                rank_char = str(8 - r)
+                label = f"{file_char}{rank_char}"
+
+                cv2.putText(
+                    warped,
+                    label,
+                    (x1 + 5, y2 - 5),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.4,
+                    (255, 255, 255),
+                    1
+                )
+
+        # Display all camera feeds in a grid layout
+        wrist_view = frames[0]
+        side_view = frames[2]
+
+        # Resize for display consistency
+        wrist_view = cv2.resize(wrist_view, (300, 300))
+        side_view = cv2.resize(side_view, (300, 300))
+        warped = cv2.resize(warped, (600, 600))
+
+        # Stack the views: wrist (left), top (middle), side (right)
+        combined_view = np.hstack((wrist_view, warped, side_view))
+
+        # Show the combined view along with the warped board
+        cv2.imshow("board", warped)
         cv2.imshow("camera views", combined_view)
 
-        # Key detection
-        key = cv2.waitKey(1)
-        if key == ord('q'):
+        # Check for chess piece movement (simple logic here)
+        if cv2.waitKey(10) & 0xFF == ord("q"):
             break
-        elif key == ord('r'):
+        if cv2.waitKey(10) & 0xFF == ord("r"):
             print("\nRecalibrating...\n")
-            calib = calibrate(cv2.VideoCapture(CAMERA_INDEXES[1]))  # Recalibrate with top camera
+            calib = calibrate(caps[0])
+
+        # Get Stockfish move (just an example)
+        stockfish_move = get_stockfish_move(current_board)
+        print(f"Stockfish suggests: {stockfish_move}")
 
     # Release all camera objects
-    for thread in threads:
-        thread.join()
+    for cap in caps:
+        cap.release()
     cv2.destroyAllWindows()
 
 if __name__ == "__main__":
