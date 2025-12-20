@@ -65,7 +65,12 @@ def mouse_cb(event, x, y, flags, param):
         clicked_points.append((x, y))
         print(f"Point {len(clicked_points)}: {x}, {y}")
 
-def calibrate(cap):
+def calibrate_with_frame_source(frame_source, source_type="capture"):
+    """
+    Calibrate using either a direct capture object or frame array
+    frame_source: either cv2.VideoCapture object or frames array
+    source_type: "capture" for VideoCapture, "frames" for frame array
+    """
     global clicked_points
     clicked_points = []
 
@@ -75,35 +80,89 @@ def calibrate(cap):
     print("2) h8 (top-right)")
     print("3) h1 (bottom-right)")
     print("4) a1 (bottom-left)")
-    print("Press Q when done\n")
+    print("Press Q when done, ESC to cancel\n")
 
+    # Destroy any existing windows first
+    cv2.destroyAllWindows()
+    cv2.waitKey(1)
+    
     cv2.namedWindow("calibrate", cv2.WINDOW_NORMAL)
+    cv2.resizeWindow("calibrate", 800, 600)
     cv2.setMouseCallback("calibrate", mouse_cb)
 
-    while True:
-        ret, frame = cap.read()
-        if not ret:
-            continue
+    start_time = time.time()
+    timeout = 60  # 60 second timeout
+    
+    try:
+        while time.time() - start_time < timeout:
+            frame = None
+            
+            if source_type == "capture":
+                ret, frame = frame_source.read()
+                if not ret:
+                    time.sleep(0.01)
+                    continue
+            elif source_type == "frames":
+                # Get frame from threading source
+                with frame_lock:
+                    if frame_source[1] is not None:  # top camera frame
+                        frame = frame_source[1].copy()
+                
+                if frame is None:
+                    time.sleep(0.01)
+                    continue
 
-        for p in clicked_points:
-            cv2.circle(frame, p, 6, (0, 0, 255), -1)
+            # Draw clicked points with better visibility
+            for i, p in enumerate(clicked_points):
+                cv2.circle(frame, p, 10, (0, 0, 255), -1)
+                cv2.circle(frame, p, 12, (255, 255, 255), 2)
+                cv2.putText(frame, str(i+1), (p[0]+15, p[1]-15), 
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
 
-        cv2.imshow("calibrate", frame)
+            # Show instructions with better visibility
+            instruction_text = f"Click point {len(clicked_points)+1}/4"
+            if len(clicked_points) == 4:
+                instruction_text = "Press Q to save calibration"
+                
+            cv2.rectangle(frame, (5, 5), (400, 40), (0, 0, 0), -1)
+            cv2.putText(frame, instruction_text, 
+                       (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
 
-        if cv2.waitKey(10) & 0xFF == ord("q"):
-            break
+            cv2.imshow("calibrate", frame)
 
-    cv2.destroyWindow("calibrate")
+            key = cv2.waitKey(30) & 0xFF
+            if key == ord('q') and len(clicked_points) == 4:
+                break
+            elif key == 27:  # ESC key
+                print("Calibration cancelled")
+                cv2.destroyWindow("calibrate")
+                cv2.waitKey(1)
+                return None
 
-    if len(clicked_points) != 4:
-        raise RuntimeError("Calibration failed: need exactly 4 points")
+        # Clean up window
+        cv2.destroyWindow("calibrate")
+        cv2.waitKey(1)
 
-    calib = {"points": clicked_points}
-    with open(CALIB_FILE, "w") as f:
-        json.dump(calib, f, indent=2)
+        if len(clicked_points) != 4:
+            print(f"Calibration failed: got {len(clicked_points)} points, need 4")
+            return None
 
-    print("Calibration saved.")
-    return calib
+        calib = {"points": clicked_points}
+        with open(CALIB_FILE, "w") as f:
+            json.dump(calib, f, indent=2)
+
+        print("Calibration saved successfully!")
+        return calib
+        
+    except Exception as e:
+        print(f"Calibration error: {e}")
+        cv2.destroyWindow("calibrate")
+        cv2.waitKey(1)
+        return None
+
+def calibrate(cap):
+    """Legacy function for backwards compatibility"""
+    return calibrate_with_frame_source(cap, "capture")
 
 def load_calibration():
     with open(CALIB_FILE, "r") as f:
@@ -217,13 +276,15 @@ def main():
     if os.path.exists(CALIB_FILE):
         calib = load_calibration()
     else:
-        # Try to use the top camera for calibration
-        calib_cap = cv2.VideoCapture(CAMERA_INDEXES[1])
-        if not calib_cap.isOpened():
-            print(f"Error: Cannot open camera {CAMERA_INDEXES[1]} for calibration!")
+        print("No calibration found, using live camera feed for calibration...")
+        # Use the threaded frames for calibration to avoid camera conflicts
+        calib = calibrate_with_frame_source(frames, "frames")
+        if calib is None:
+            print("Calibration failed!")
+            stop_capture = True
+            for thread in threads:
+                thread.join()
             return
-        calib = calibrate(calib_cap)
-        calib_cap.release()
 
     cv2.namedWindow("board", cv2.WINDOW_NORMAL)
     cv2.resizeWindow("board", 900, 900)
@@ -278,7 +339,10 @@ def main():
             break
         elif key == ord('r'):
             print("\nRecalibrating...\n")
-            calib = calibrate(cv2.VideoCapture(CAMERA_INDEXES[1]))  # Recalibrate with top camera
+            # Use the live threaded frames for recalibration
+            calib = calibrate_with_frame_source(frames, "frames")
+            if calib is None:
+                print("Recalibration failed, continuing with old calibration")
 
     # Stop capture threads
     stop_capture = True
