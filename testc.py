@@ -20,17 +20,9 @@ FRAME_WIDTH = 640  # Resolution for FPS
 FRAME_HEIGHT = 480
 FPS = 30  # Set the frame rate to 30 FPS for each camera
 
-# =========================
-# GLOBALS
-# =========================
-
 clicked_points = []
-frame_lock = threading.Lock()  # To avoid race conditions when accessing frames
-frames = [None, None, None]  # To hold frames from the cameras
-
-# =========================
-# CAMERA DETECTION
-# =========================
+frame_lock = threading.Lock()  
+frames = [None, None, None]  
 
 def detect_cameras():
     """Detect available cameras by testing indices 0-10"""
