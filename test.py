@@ -11,7 +11,7 @@ import time  # Importing the missing time module
 # CONFIG
 # =========================
 
-CAMERA_INDEXES = [4, 6, 3]  # wrist(4), top(6), side(3)
+CAMERA_INDEXES = [2, 3, 6]  # USB2.0_CAM1(2), UGREEN Camera 2K(3), UGREEN Camera(6)
 CALIB_FILE = "board_calib_4pt.json"
 BOARD_SIZE = 800  # The warped board will be BOARD_SIZE x BOARD_SIZE
 OCCUPANCY_THRESHOLD = 140
@@ -129,46 +129,93 @@ def get_stockfish_move(current_board):
 # THREADING FOR CAMERA CAPTURE
 # =========================
 
-def capture_frames(camera_idx, frame_array):
+stop_capture = False
+
+def capture_frames(camera_idx, array_idx, frame_array):
+    global stop_capture
     cap = cv2.VideoCapture(camera_idx)
+    
+    if not cap.isOpened():
+        print(f"Failed to open camera {camera_idx}")
+        return
+        
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, FRAME_WIDTH)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, FRAME_HEIGHT)
     cap.set(cv2.CAP_PROP_FPS, FPS)
+    
+    print(f"Successfully opened camera {camera_idx}")
 
-    while True:
+    while not stop_capture:
         ret, frame = cap.read()
         if ret:
             with frame_lock:
-                frame_array[camera_idx] = frame
+                frame_array[array_idx] = frame
         else:
             print(f"Error capturing frame from camera {camera_idx}")
-            break
+            time.sleep(0.1)  # Brief pause before retry
 
     cap.release()
+    print(f"Released camera {camera_idx}")
 
 # =========================
 # MAIN
 # =========================
 
 def main():
+    global stop_capture
+    
+    print(f"Attempting to connect to cameras: {CAMERA_INDEXES}")
+    
+    # Set camera permissions first
+    for camera_idx in CAMERA_INDEXES:
+        os.system(f"sudo chmod 666 /dev/video{camera_idx}")
+        print(f"Set permissions for /dev/video{camera_idx}")
+    
+    # Test camera connections before starting threads
+    working_cameras = []
+    for camera_idx in CAMERA_INDEXES:
+        test_cap = cv2.VideoCapture(camera_idx)
+        if test_cap.isOpened():
+            working_cameras.append(camera_idx)
+            print(f"✅ Camera {camera_idx} is accessible")
+            test_cap.release()
+        else:
+            print(f"❌ Camera {camera_idx} failed to open")
+    
+    if len(working_cameras) == 0:
+        print("❌ No cameras are working! Check connections and permissions.")
+        return
+    
+    print(f"📊 {len(working_cameras)}/{len(CAMERA_INDEXES)} cameras working: {working_cameras}")
+    
     # Initialize the frames array
     frames = [None] * len(CAMERA_INDEXES)
     
     # Start the camera capture threads
     threads = []
     for i, camera_idx in enumerate(CAMERA_INDEXES):
-        thread = threading.Thread(target=capture_frames, args=(i, frames))
+        thread = threading.Thread(target=capture_frames, args=(camera_idx, i, frames))
         threads.append(thread)
         thread.start()
 
     # Wait for the threads to initialize
-    time.sleep(2)  # Sleep a bit to ensure threads are capturing frames
+    print("Waiting for camera threads to initialize...")
+    time.sleep(3)  # Give more time for initialization
 
     # Load calibration or calibrate
     if os.path.exists(CALIB_FILE):
         calib = load_calibration()
     else:
-        calib = calibrate(cv2.VideoCapture(CAMERA_INDEXES[1]))  # Use the top camera for calibration
+        # Try to use the top camera for calibration
+        test_cap = cv2.VideoCapture(CAMERA_INDEXES[1])
+        if not test_cap.isOpened():
+            print(f"Cannot open camera {CAMERA_INDEXES[1]} for calibration")
+            stop_capture = True
+            for thread in threads:
+                thread.join()
+            return
+        calib = calibrate(test_cap)
+        test_cap.release()
 
     cv2.namedWindow("board", cv2.WINDOW_NORMAL)
     cv2.resizeWindow("board", 900, 900)
@@ -185,29 +232,31 @@ def main():
         with frame_lock:
             # Check if any frame is None
             if any(frame is None for frame in frames):
+                print("Waiting for camera frames...")
+                time.sleep(0.1)
                 continue
 
-            top_view = frames[1]
-            side_view = frames[2]
-            wrist_view = frames[0]
+            top_view = frames[1].copy()
+            side_view = frames[2].copy()
+            wrist_view = frames[0].copy()
 
-            # Process the top view for chess detection
-            warped_top = warp_board(top_view, calib["points"])
-            rotated_board = rotate_board(warped_top)
+        # Process the top view for chess detection
+        warped_top = warp_board(top_view, calib["points"])
+        rotated_board = rotate_board(warped_top)
 
-            sq = BOARD_SIZE // 8
-            for r in range(1, 8):
-                cv2.line(rotated_board, (0, r * sq), (BOARD_SIZE, r * sq), (255, 0, 0), 2)
-                cv2.line(rotated_board, (r * sq, 0), (r * sq, BOARD_SIZE), (255, 0, 0), 2)
+        sq = BOARD_SIZE // 8
+        for r in range(1, 8):
+            cv2.line(rotated_board, (0, r * sq), (BOARD_SIZE, r * sq), (255, 0, 0), 2)
+            cv2.line(rotated_board, (r * sq, 0), (r * sq, BOARD_SIZE), (255, 0, 0), 2)
 
-            # Add labels on the rotated board
-            for r in range(8):
-                cv2.putText(rotated_board, str(8 - r), (5, r * sq + 15), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
-            for c in range(8):
-                cv2.putText(rotated_board, chr(ord('a') + c), (c * sq + 15, BOARD_SIZE - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+        # Add labels on the rotated board
+        for r in range(8):
+            cv2.putText(rotated_board, str(8 - r), (5, r * sq + 15), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+        for c in range(8):
+            cv2.putText(rotated_board, chr(ord('a') + c), (c * sq + 15, BOARD_SIZE - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
 
-            # Display the warped, rotated board
-            cv2.imshow("board", rotated_board)
+        # Display the warped, rotated board
+        cv2.imshow("board", rotated_board)
 
         # Show all camera views stacked horizontally
         top_view_resized = cv2.resize(top_view, (300, 300))
@@ -223,9 +272,15 @@ def main():
             break
         elif key == ord('r'):
             print("\nRecalibrating...\n")
-            calib = calibrate(cv2.VideoCapture(CAMERA_INDEXES[1]))  # Recalibrate with top camera
+            test_cap = cv2.VideoCapture(CAMERA_INDEXES[1])
+            if test_cap.isOpened():
+                calib = calibrate(test_cap)
+                test_cap.release()
+            else:
+                print("Cannot open camera for recalibration")
 
-    # Release all camera objects
+    # Stop capture threads and clean up
+    stop_capture = True
     for thread in threads:
         thread.join()
     cv2.destroyAllWindows()
