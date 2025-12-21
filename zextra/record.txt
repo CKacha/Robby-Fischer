@@ -83,13 +83,15 @@ lerobot-record \
     --teleop.port=/dev/ttyACM0 \
     --teleop.id=my_awesome_leader_arm \
     --display_data=true \
-    --dataset.repo_id=Bor3dguy/e7e5pawnfinal \
-    --dataset.num_episodes=10 \
-    --dataset.episode_time_s=15 \
-    --dataset.reset_time_s=10 \
+    --dataset.repo_id=Bor3dguy/Ng8Nf6v1 \
+    --dataset.num_episodes=20 \
+    --dataset.episode_time_s=20 \
+    --dataset.reset_time_s=5 \
     --dataset.single_task="X" \
-    --dataset.root=home/bor3d/so101_datasetv2 \
+    --dataset.root=home/bor3d/so101_datasetv7 \
     --resume=True
+
+e7e5pawnfinal
 
 
 # GETTING THE MODEL BACK 
