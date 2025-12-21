@@ -1030,7 +1030,7 @@ def execute_lerobot_move(move_type, move_string):
             "--robot.type=so101_follower",
             "--robot.port=/dev/ttyACM1",
             "--robot.id=my_awesome_follower_arm",
-            '--robot.cameras="{wrist: {type: opencv, index_or_path: 5, width: 640, height: 480, fps: 30}, corner: {type: opencv, index_or_path: 2, width: 640, height: 480, fps: 30}, top: {type: opencv, index_or_path: 10, width: 640, height: 480, fps: 30}, side: {type: opencv, index_or_path: 6, width: 640, height: 480, fps: 30}}"',
+            '--robot.cameras={"wrist": {"type": "opencv", "index_or_path": 5, "width": 640, "height": 480, "fps": 30}, "corner": {"type": "opencv", "index_or_path": 2, "width": 640, "height": 480, "fps": 30}, "top": {"type": "opencv", "index_or_path": 10, "width": 640, "height": 480, "fps": 30}, "side": {"type": "opencv", "index_or_path": 6, "width": 640, "height": 480, "fps": 30}}',
             "--dataset.single_task=pick up pawn and move it",
             "--dataset.repo_id=${HF_USER}/eval_act_base",
             "--dataset.root=${PWD}/eval_lerobot_datasetp/",
