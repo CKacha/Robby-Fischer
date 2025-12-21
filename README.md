@@ -23,10 +23,8 @@
   <a href="#about-us">About Us</a> •
   <a href="#overview">Overview</a> •
   <a href="#features">Features</a> •
-  <a href="#algorithm">Algorithm</a> •
   <a href="#hardware">Hardware</a> •
   <a href="#wiring-diagram">Wiring Diagram</a> •
-  <a href="#team">Team</a> •
   <a href="#credits">Credits</a>
 </p>
 
@@ -58,10 +56,6 @@
 (insert video here )
 
 ---
-
-## Algorithm Diagram
-
-<img src="MISSING PROJECT IMAGE URL" alt="Robby_Fischer_Build" width="800"/>
 
 
 
