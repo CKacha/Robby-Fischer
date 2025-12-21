@@ -1,15 +1,15 @@
 <h1 align="center">
   <br>
-  <a href="https://blueprint.hackclub.com/prototype"><img src="https://hc-cdn.hel1.your-objectstorage.com/s/v3/d1252b6d5ee8f6e7_group_3.png" width="200"></a>
+  <a href="https://blueprint.hackclub.com/prototype">
+    <img src="https://hc-cdn.hel1.your-objectstorage.com/s/v3/d1252b6d5ee8f6e7_group_3.png" width="200">
+  </a>
   <br>
   Robby Fischer
   <br>
 </h1>
 
 <h4 align="center">
-  
-Robby Fischer is a chess-playing robotic arm system that uses computer vision and imitation Learning AI to play chess autonomously against human opponents!
-
+  Robby Fischer is a chess-playing robotic arm system that uses computer vision and imitation learning AI to play chess autonomously against human opponents.
 </h4>
 
 <div align="center">
@@ -20,37 +20,91 @@ Robby Fischer is a chess-playing robotic arm system that uses computer vision an
 </div>
 
 <p align="center">
-  <a href="#Overview">Overview</a> •
-  <a href="#Features">Features</a> •
-  <a href="#Algorithim">Algorithim</a> •
-  <a href="#credits">Credits</a> •
+  <a href="#about-us">About Us</a> •
+  <a href="#overview">Overview</a> •
+  <a href="#features">Features</a> •
+  <a href="#algorithm">Algorithm</a> •
+  <a href="#hardware">Hardware</a> •
+  <a href="#wiring-diagram">Wiring Diagram</a> •
+  <a href="#team">Team</a> •
+  <a href="#credits">Credits</a>
 </p>
 
-<img src="notdone" alt="Robby_Fischer_Build" width="800"/>
+---
+
+## About Us
+
+### Our Team!
+
+**Team Name:** The Fischers  
+**Team Number:** 18
+**GitHub Usernames:**  
+- @TaniWanKenobi
+- @techn1-cal  
+- @ChanminK
+  
+### Project Image
+
+<img src="MISSING PROJECT IMAGE URL" alt="Robby_Fischer_Build" width="800"/>
+
+---
+
+## Project Media
+
+<img src="MISSING PROJECT IMAGE URL" alt="Robby_Fischer_Build" width="800"/>
+
+<video here src="MISSING PROJECT IMAGE URL" alt="Robby_Fischer_Build" width="800"/>
+
+
+---
+
+## Diagrams
+
+### Algorithm Diagram
+
+<img src="MISSING PROJECT IMAGE URL" alt="Robby_Fischer_Build" width="800"/>
+
+### Wiring Diagram
+
+<img src="MISSING PROJECT IMAGE URL" alt="Robby_Fischer_Build" width="800"/>
+
+
+## BOM
+
+- Hugging Face LeRobot SO-ARM101
+- AMD AI PC (Ryzen AI)
+- USB Cameras (x3)
+- Chess Board
+- Chess Pieces (3D printed)
+- Power Supply
+- Misc. wiring and mounts
+
+---
+
 
 ## Overview
 
-ChessArm is an intelligent chess system that:
-- **Captures** the board state using multiple cameras that track the position of the arm and chess board
+ChessArm is an intelligent robotic chess system that:
+
+- **Captures** the board state using multiple calibrated cameras
 - **Detects** opponent moves via vision-based piece tracking
-- **Analyzes** the board using Stockfish chess engine
-- **Executes** chess moves using the [Hugging Face LeRobot SO‑ARM101 arm](https://github.com/huggingface/lerobot)
-  
-**Game Flow**: Camera Input → Board Detection → Stockfish AI → Arm Execution → Repeat
+- **Analyzes** board positions using the Stockfish chess engine
+- **Executes** moves using the Hugging Face LeRobot SO-ARM101 robotic arm
+
+**Game Flow:**  
+Camera Input → Board Detection → Stockfish AI → Arm Execution → Repeat
+
+---
 
 ## Features
 
-- **Multi-Camera System**: 3  cameras (wrist, top, side) provide robust board state detection
-- **Perspective Calibration**: Automatic 4-point calibration for accurate board warping
-- **Piece Detection**: Occupancy detection based on brightness threshold (140 units)
-- **AI Integration**: Stockfish engine for optimal move suggestions (2-second time limit)
-- **Turn-Based Logic**: Automatic alternation between robot (Red) and opponent (White)
+- **Multi-Camera System**: Three cameras (wrist, top-down, side)
+- **Perspective Calibration**: Automatic 4-point homography correction
+- **Piece Detection**: Brightness-based occupancy detection (threshold = 140)
+- **AI Integration**: Stockfish engine with 2-second move time limit
+- **Turn Logic**: Alternates between human (White) and robot (Red)
 
-## Algorithm
-
-insert img when chris done
-
-## Credits
+# Credits
 
 This project uses the following open-source projects
 
@@ -61,6 +115,4 @@ This project uses the following open-source projects
   - C
 - Insert more later
 
- 
--  
 
