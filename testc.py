@@ -11,7 +11,7 @@ import time
 # CONFIG
 # =========================
 
-CAMERA_INDEXES = [8, 7, 3]  # wrist(8), top(7), side(3) - based on camera.txt
+CAMERA_INDEXES = [5, 10, 6]  # wrist(5), top(10), side(6) - based on camera.txt
 CALIB_FILE = "board_calib_4pt.json"
 BOARD_SIZE = 800  # The warped board will be BOARD_SIZE x BOARD_SIZE
 OCCUPANCY_THRESHOLD = 120  # Adjusted for better detection - lower = more sensitive
