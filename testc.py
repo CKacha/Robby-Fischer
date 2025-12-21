@@ -1005,6 +1005,152 @@ def occupancy_to_fen(occupancy_matrix, reference_board=None):
     return "/".join(fen_rows) + " w - - 0 1"
 
 # =========================
+# LEROBOT INTEGRATION
+# =========================
+
+import subprocess
+import os
+
+def execute_lerobot_move(move_type, move_string):
+    """
+    Execute a chess move using LeRobot trained models
+    move_type: "pawn", "knight", "bishop", etc.
+    move_string: the chess move in UCI format (e.g., "e2e4")
+    """
+    
+    print(f"\n🤖 EXECUTING LEROBOT MOVE: {move_type.upper()} - {move_string}")
+    print("CALLS:")
+    print(f"{move_type.upper()}")
+    print("=" * 50)
+    
+    # Use the exact command format you specified
+    if move_type.lower() == "pawn":
+        cmd = [
+            "lerobot-record",
+            "--robot.type=so101_follower",
+            "--robot.port=/dev/ttyACM1",
+            "--robot.id=my_awesome_follower_arm",
+            '--robot.cameras="{wrist: {type: opencv, index_or_path: 5, width: 640, height: 480, fps: 30}, corner: {type: opencv, index_or_path: 2, width: 640, height: 480, fps: 30}, top: {type: opencv, index_or_path: 10, width: 640, height: 480, fps: 30}, side: {type: opencv, index_or_path: 6, width: 640, height: 480, fps: 30}}"',
+            "--dataset.single_task=pick up pawn and move it",
+            "--dataset.repo_id=${HF_USER}/eval_act_base",
+            "--dataset.root=${PWD}/eval_lerobot_datasetp/",
+            "--dataset.episode_time_s=120",
+            "--dataset.num_episodes=1",
+            "--policy.path=Bor3dguy/act_so101_e7e5pawnv3"
+        ]
+    else:
+        # Fallback for other piece types - use similar format but different policies
+        lerobot_commands = {
+            "knight": {
+                "policy_path": "Bor3dguy/knight",
+                "task_name": "Move knight"
+            },
+            "bishop": {
+                "policy_path": "Bor3dguy/act_so101_Bb4v1",
+                "task_name": "Bishop"
+            },
+            "default": {
+                "policy_path": "Bor3dguy/act_so101_e7e5pawnv3",
+                "task_name": "pick up piece and move it"
+            }
+        }
+        
+        config = lerobot_commands.get(move_type.lower(), lerobot_commands["default"])
+        
+        cmd = [
+            "lerobot-record",
+            "--robot.type=so101_follower",
+            "--robot.port=/dev/ttyACM1",
+            "--robot.id=my_awesome_follower_arm",
+            '--robot.cameras="{wrist: {type: opencv, index_or_path: 5, width: 640, height: 480, fps: 30}, corner: {type: opencv, index_or_path: 2, width: 640, height: 480, fps: 30}, top: {type: opencv, index_or_path: 10, width: 640, height: 480, fps: 30}, side: {type: opencv, index_or_path: 6, width: 640, height: 480, fps: 30}}"',
+            f"--dataset.single_task={config['task_name']}",
+            "--dataset.repo_id=${HF_USER}/eval_act_base",
+            "--dataset.root=${PWD}/eval_lerobot_datasetp/",
+            "--dataset.episode_time_s=120",
+            "--dataset.num_episodes=1",
+            f"--policy.path={config['policy_path']}"
+        ]
+    
+    # Print the command in the exact format you specified
+    print("🔧 LEROBOT COMMAND:")
+    for i, arg in enumerate(cmd):
+        if i == 0:
+            print(arg + " \\")
+        elif i == len(cmd) - 1:
+            print(f"  {arg}")
+        else:
+            print(f"  {arg} \\")
+    print("")
+    
+    try:
+        print("🚀 Starting LeRobot execution...")
+        print("   (This will control the robot arm to execute the move)")
+        print("   Press Ctrl+C to abort if needed")
+        print("")
+        
+        # Execute the command - expand environment variables
+        import os
+        expanded_cmd = []
+        for arg in cmd:
+            # Expand ${HF_USER} and ${PWD} environment variables
+            if "${HF_USER}" in arg:
+                hf_user = os.getenv("HF_USER", "default_user")
+                arg = arg.replace("${HF_USER}", hf_user)
+            if "${PWD}" in arg:
+                pwd = os.getcwd()
+                arg = arg.replace("${PWD}", pwd)
+            expanded_cmd.append(arg)
+        
+        result = subprocess.run(expanded_cmd, capture_output=False, text=True, timeout=300)  # 5 minute timeout
+        
+        if result.returncode == 0:
+            print("✅ LeRobot execution completed successfully!")
+            print("🎯 Robot arm has executed the move")
+            return True
+        else:
+            print(f"❌ LeRobot execution failed (exit code: {result.returncode})")
+            return False
+            
+    except subprocess.TimeoutExpired:
+        print("⏰ LeRobot execution timed out (5 minutes)")
+        return False
+    except KeyboardInterrupt:
+        print("\n🛑 LeRobot execution interrupted by user")
+        return False
+    except FileNotFoundError:
+        print("❌ LeRobot not found! Make sure lerobot is installed and in PATH")
+        print("   Install with: pip install lerobot")
+        return False
+    except Exception as e:
+        print(f"❌ Unexpected error during LeRobot execution: {e}")
+        return False
+
+def get_move_type(move_string, board):
+    """
+    Determine what type of piece is being moved
+    Returns: "pawn", "knight", "bishop", "rook", "queen", "king"
+    """
+    try:
+        move = chess.Move.from_uci(move_string)
+        piece = board.piece_at(move.from_square)
+        
+        if piece:
+            piece_type_map = {
+                chess.PAWN: "pawn",
+                chess.KNIGHT: "knight", 
+                chess.BISHOP: "bishop",
+                chess.ROOK: "rook",
+                chess.QUEEN: "queen",
+                chess.KING: "king"
+            }
+            return piece_type_map.get(piece.piece_type, "pawn")
+        else:
+            return "pawn"  # Default fallback
+            
+    except:
+        return "pawn"  # Default fallback
+
+# =========================
 # DEMO MODE - PRESET MOVES
 # =========================
 
@@ -1147,6 +1293,14 @@ def main():
 
     # Try to create windows with error handling for headless systems
     try:
+        # Test if GUI is available first
+        test_img = np.zeros((100, 100, 3), dtype=np.uint8)
+        cv2.namedWindow("test_window", cv2.WINDOW_NORMAL)
+        cv2.imshow("test_window", test_img)
+        cv2.waitKey(1)
+        cv2.destroyWindow("test_window")
+        
+        # If we get here, GUI works
         cv2.namedWindow("board", cv2.WINDOW_NORMAL)
         cv2.resizeWindow("board", 900, 900)
         
@@ -1154,13 +1308,18 @@ def main():
         cv2.resizeWindow("analysis", 400, 600)
         
         gui_available = True
-        print("GUI windows available")
+        print("✅ GUI windows available")
     except cv2.error as e:
         gui_available = False
         print(f"⚠️  GUI not available: {e}")
-        print("Running in headless mode - no visual output")
-        print("Install GUI support with: sudo apt install libgtk2.0-dev pkg-config")
-        print("Then reinstall opencv: pip uninstall opencv-python && pip install opencv-python")
+        print("🔧 To fix this on Ubuntu, run:")
+        print("   sudo apt update")
+        print("   sudo apt install -y libgtk2.0-dev pkg-config")
+        print("   pip uninstall -y opencv-python")
+        print("   pip install opencv-python")
+        print("")
+        print("🖥️  Running in headless mode - terminal input only")
+        print("   Use keyboard commands (s, m, c, etc.) followed by ENTER")
 
     print("\nRUNNING")
     print("Controls:")
@@ -1170,6 +1329,7 @@ def main():
     print("  A = Get suggested move for human")
     print("  C = Confirm move after executing it")
     print("  K = Confirm capture (if detection missed it)")
+    print("  L = Execute current suggestion with LeRobot")
     print("  N = New game")
     print("  R = Recalibrate board position")
     print("  T = Tune piece detection thresholds")
@@ -1181,10 +1341,11 @@ def main():
     print("")
     print("🎭 DEMO MODE WORKFLOW:")
     print("1. Robot (White) will suggest preset moves automatically")
-    print("2. Execute the robot's suggested move on the physical board")
-    print("3. Press 'C' to confirm the move OR enable move detection with 'D'")
-    print("4. Make your human (Black) move")
-    print("5. Robot will suggest the next preset move")
+    print("2. Press 'L' to execute the suggestion with LeRobot OR")
+    print("3. Execute the robot's suggested move manually on the board")
+    print("4. Press 'C' to confirm the move OR enable move detection with 'D'")
+    print("5. Make your human (Black) move")
+    print("6. Robot will suggest the next preset move")
     print("")
     print("DEMO GAME SEQUENCE:")
     print("White: e2e4 → g1f3 → f1b4 → f2f4 → e1g1 (castle)")
@@ -1668,6 +1829,46 @@ def main():
                     print(f"Current suggestion: {last_suggestion}")
                 else:
                     print("No suggestion needed right now")
+        elif key == ord('l'):
+            # Execute current suggestion with LeRobot
+            if last_suggestion:
+                print(f"\n🤖 EXECUTING SUGGESTION WITH LEROBOT: {last_suggestion}")
+                
+                # Determine move type
+                move_type = get_move_type(str(last_suggestion), current_board)
+                print(f"Move type detected: {move_type}")
+                
+                # Execute with LeRobot
+                success = execute_lerobot_move(move_type, str(last_suggestion))
+                
+                if success:
+                    print("✅ LeRobot execution successful - confirming move")
+                    # Auto-confirm the move since LeRobot executed it
+                    current_board.push(last_suggestion)
+                    move_counter += 1
+                    
+                    # Update expected board state
+                    previous_occupancy = get_board_occupancy_from_chess_board(current_board)
+                    
+                    # Clear the suggestion since it was executed
+                    last_suggestion = None
+                    last_analysis = None
+                    
+                    # Switch turns
+                    if current_board.turn == chess.WHITE:  # Now white's turn (robot)
+                        waiting_for_human_move = False
+                        waiting_for_robot_move = True
+                        print("Robot's turn")
+                    else:  # Now black's turn (human)
+                        waiting_for_human_move = True
+                        waiting_for_robot_move = False
+                        print("💭 Human's turn - make your move")
+                else:
+                    print("❌ LeRobot execution failed - suggestion still available")
+                    print("   You can try again with 'L' or execute manually and press 'C'")
+            else:
+                print("❌ No suggestion available to execute")
+                print("   Press 'S' to get a suggestion first")
         elif key == ord('m'):
             print("\nEnter move (e.g., e2e4): ", end="")
             move_input = input()
