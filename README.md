@@ -18,6 +18,16 @@ Robby Fischer is a chess-playing robotic arm system that uses computer vision an
 ![Hack Club](https://img.shields.io/badge/Hack_Club-33d6a6.svg?style=for-the-badge&logo=hackclub&logoColor=white)
 ![AMD](https://img.shields.io/badge/AMD-ed1c24.svg?style=for-the-badge&logo=amd&logoColor=white)
 
+</div>
+
+<p align="center">
+  <a href="#Overview">Overview</a> •
+  <a href="#Features">Features</a> •
+  <a href="#Algorithim">Algorithim</a> •
+  <a href="#credits">Credits</a> •
+  <a href="#license">License</a>
+</p>
+
 ChessArm is an intelligent chess system that:
 - **Captures** the board state using multiple cameras that track the 
 - **Detects** opponent moves via vision-based piece tracking
