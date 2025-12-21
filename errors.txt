@@ -2,16 +2,122 @@
    (This will control the robot arm to execute the move)
    Press Ctrl+C to abort if needed
 
-Traceback (most recent call last):
-  File "/home/bor3d/Documents/GitHub/ChessArm/.venv/lib/python3.13/site-packages/draccus/parsers/decoding.py", line 133, in decode_dataclass
-    field_value = get_decoding_fn(field_type)(raw_value, (*path, name))
-  File "/home/bor3d/Documents/GitHub/ChessArm/.venv/lib/python3.13/site-packages/draccus/parsers/decoding.py", line 463, in _decode_dict
-    items = raw_value.items()
-            ^^^^^^^^^^^^^^^
-AttributeError: 'str' object has no attribute 'items'
-
-The above exception was the direct cause of the following exception:
-
+WARNING:root:No accelerated backend detected. Using default cpu, this will be slow.
+WARNING:lerobot.configs.policies:Device 'cuda' is not available. Switching to 'cpu'.
+WARNING:root:No accelerated backend detected. Using default cpu, this will be slow.
+WARNING:lerobot.configs.policies:Device 'cuda' is not available. Switching to 'cpu'.
+INFO 2025-12-21 14:15:14 t_record.py:375 {'dataset': {'episode_time_s': 120,
+             'fps': 30,
+             'num_episodes': 1,
+             'num_image_writer_processes': 0,
+             'num_image_writer_threads_per_camera': 4,
+             'private': False,
+             'push_to_hub': True,
+             'rename_map': {},
+             'repo_id': 'default_user/eval_act_base',
+             'reset_time_s': 60,
+             'root': '/home/bor3d/Documents/GitHub/ChessArm/eval_lerobot_datasetp/',
+             'single_task': 'pick up pawn and move it',
+             'tags': None,
+             'video': True,
+             'video_encoding_batch_size': 1},
+ 'display_data': False,
+ 'play_sounds': True,
+ 'policy': {'chunk_size': 100,
+            'device': 'cpu',
+            'dim_feedforward': 3200,
+            'dim_model': 512,
+            'dropout': 0.1,
+            'feedforward_activation': 'relu',
+            'input_features': {'observation.images.corner': {'shape': (3,
+                                                                       480,
+                                                                       640),
+                                                             'type': <FeatureType.VISUAL: 'VISUAL'>},
+                               'observation.images.side': {'shape': (3,
+                                                                     480,
+                                                                     640),
+                                                           'type': <FeatureType.VISUAL: 'VISUAL'>},
+                               'observation.images.top': {'shape': (3,
+                                                                    480,
+                                                                    640),
+                                                          'type': <FeatureType.VISUAL: 'VISUAL'>},
+                               'observation.images.wrist': {'shape': (3,
+                                                                      480,
+                                                                      640),
+                                                            'type': <FeatureType.VISUAL: 'VISUAL'>},
+                               'observation.state': {'shape': (6,),
+                                                     'type': <FeatureType.STATE: 'STATE'>}},
+            'kl_weight': 10.0,
+            'latent_dim': 32,
+            'license': None,
+            'n_action_steps': 100,
+            'n_decoder_layers': 1,
+            'n_encoder_layers': 4,
+            'n_heads': 8,
+            'n_obs_steps': 1,
+            'n_vae_encoder_layers': 4,
+            'normalization_mapping': {'ACTION': <NormalizationMode.MEAN_STD: 'MEAN_STD'>,
+                                      'STATE': <NormalizationMode.MEAN_STD: 'MEAN_STD'>,
+                                      'VISUAL': <NormalizationMode.MEAN_STD: 'MEAN_STD'>},
+            'optimizer_lr': 1e-05,
+            'optimizer_lr_backbone': 1e-05,
+            'optimizer_weight_decay': 0.0001,
+            'output_features': {'action': {'shape': (6,),
+                                           'type': <FeatureType.ACTION: 'ACTION'>}},
+            'pre_norm': False,
+            'pretrained_backbone_weights': 'ResNet18_Weights.IMAGENET1K_V1',
+            'pretrained_path': 'Bor3dguy/act_so101_e7e5pawnv3',
+            'private': None,
+            'push_to_hub': True,
+            'replace_final_stride_with_dilation': 0,
+            'repo_id': 'Bor3dguy/act_so101_e7e5pawnv3',
+            'tags': None,
+            'temporal_ensemble_coeff': None,
+            'use_amp': False,
+            'use_vae': True,
+            'vision_backbone': 'resnet18'},
+ 'resume': False,
+ 'robot': {'calibration_dir': None,
+           'cameras': {'corner': {'color_mode': <ColorMode.RGB: 'rgb'>,
+                                  'fourcc': None,
+                                  'fps': 30,
+                                  'height': 480,
+                                  'index_or_path': 2,
+                                  'rotation': <Cv2Rotation.NO_ROTATION: 0>,
+                                  'warmup_s': 1,
+                                  'width': 640},
+                       'side': {'color_mode': <ColorMode.RGB: 'rgb'>,
+                                'fourcc': None,
+                                'fps': 30,
+                                'height': 480,
+                                'index_or_path': 6,
+                                'rotation': <Cv2Rotation.NO_ROTATION: 0>,
+                                'warmup_s': 1,
+                                'width': 640},
+                       'top': {'color_mode': <ColorMode.RGB: 'rgb'>,
+                               'fourcc': None,
+                               'fps': 30,
+                               'height': 480,
+                               'index_or_path': 10,
+                               'rotation': <Cv2Rotation.NO_ROTATION: 0>,
+                               'warmup_s': 1,
+                               'width': 640},
+                       'wrist': {'color_mode': <ColorMode.RGB: 'rgb'>,
+                                 'fourcc': None,
+                                 'fps': 30,
+                                 'height': 480,
+                                 'index_or_path': 5,
+                                 'rotation': <Cv2Rotation.NO_ROTATION: 0>,
+                                 'warmup_s': 1,
+                                 'width': 640}},
+           'disable_torque_on_disconnect': True,
+           'id': 'my_awesome_follower_arm',
+           'max_relative_target': None,
+           'port': '/dev/ttyACM1',
+           'use_degrees': False},
+ 'teleop': None}
+[ WARN:0@3.447] global cap_v4l.cpp:914 open VIDEOIO(V4L2:/dev/video5): can't open camera by index
+[ERROR:0@3.610] global obsensor_uvc_stream_channel.cpp:163 getStreamChannelGroup Camera index out of range
 Traceback (most recent call last):
   File "/home/bor3d/Documents/GitHub/ChessArm/.venv/bin/lerobot-record", line 7, in <module>
     sys.exit(main())
@@ -19,35 +125,19 @@ Traceback (most recent call last):
   File "/home/bor3d/Documents/GitHub/ChessArm/.venv/lib/python3.13/site-packages/lerobot/scripts/lerobot_record.py", line 516, in main
     record()
     ~~~~~~^^
-  File "/home/bor3d/Documents/GitHub/ChessArm/.venv/lib/python3.13/site-packages/lerobot/configs/parser.py", line 232, in wrapper_inner
-    cfg = draccus.parse(config_class=argtype, config_path=config_path, args=cli_args)
-  File "/home/bor3d/Documents/GitHub/ChessArm/.venv/lib/python3.13/site-packages/draccus/argparsing.py", line 211, in parse
-    return parser.parse_args(args)
-           ~~~~~~~~~~~~~~~~~^^^^^^
-  File "/home/bor3d/Documents/GitHub/ChessArm/.venv/lib/python3.13/site-packages/draccus/argparsing.py", line 102, in parse_args
-    args, _ = self.parse_known_args(args, namespace, is_parse_args=True)
-              ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/bor3d/Documents/GitHub/ChessArm/.venv/lib/python3.13/site-packages/draccus/argparsing.py", line 136, in parse_known_args
-    parsed_t = self._postprocessing(parsed_args)
-  File "/home/bor3d/Documents/GitHub/ChessArm/.venv/lib/python3.13/site-packages/draccus/argparsing.py", line 180, in _postprocessing
-    cfg = decoding.decode(self.config_class, deflat_d)
-  File "/home/bor3d/Documents/GitHub/ChessArm/.venv/lib/python3.13/site-packages/draccus/parsers/registry_utils.py", line 78, in wrapper
-    return base_func(*args, **kw)
-  File "/home/bor3d/Documents/GitHub/ChessArm/.venv/lib/python3.13/site-packages/draccus/parsers/decoding.py", line 48, in decode
-    return get_decoding_fn(cls)(raw_value, ())  # type: ignore
-           ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^
-  File "/home/bor3d/Documents/GitHub/ChessArm/.venv/lib/python3.13/site-packages/draccus/parsers/decoding.py", line 135, in decode_dataclass
-    raise e
-  File "/home/bor3d/Documents/GitHub/ChessArm/.venv/lib/python3.13/site-packages/draccus/parsers/decoding.py", line 133, in decode_dataclass
-    field_value = get_decoding_fn(field_type)(raw_value, (*path, name))
-  File "/home/bor3d/Documents/GitHub/ChessArm/.venv/lib/python3.13/site-packages/draccus/parsers/decoding.py", line 201, in decode_choice_class
-    return decode_dataclass(subcls, raw_value, path)
-  File "/home/bor3d/Documents/GitHub/ChessArm/.venv/lib/python3.13/site-packages/draccus/parsers/decoding.py", line 137, in decode_dataclass
-    raise DecodingError(
-    ...<3 lines>...
-    ) from e
-draccus.utils.DecodingError: `robot.cameras`: Failed when parsing value='{wrist: {type: opencv, index_or_path: 5, width: 640, height: 480, fps: 30}, corner: {type: opencv, index_or_path: 2, width: 640, height: 480, fps: 30}, top: {type: opencv, index_or_path: 10, width: 640, height: 480, fps: 30}, side: {type: opencv, index_or_path: 6, width: 640, height: 480, fps: 30}}' into field "<class 'lerobot.robots.so101_follower.config_so101_follower.SO101FollowerConfig'>.cameras" of type dict[str, lerobot.cameras.configs.CameraConfig].
-        Underlying error is "AttributeError: 'str' object has no attribute 'items'"
+  File "/home/bor3d/Documents/GitHub/ChessArm/.venv/lib/python3.13/site-packages/lerobot/configs/parser.py", line 233, in wrapper_inner
+    response = fn(cfg, *args, **kwargs)
+  File "/home/bor3d/Documents/GitHub/ChessArm/.venv/lib/python3.13/site-packages/lerobot/scripts/lerobot_record.py", line 442, in record
+    robot.connect()
+    ~~~~~~~~~~~~~^^
+  File "/home/bor3d/Documents/GitHub/ChessArm/.venv/lib/python3.13/site-packages/lerobot/robots/so101_follower/so101_follower.py", line 101, in connect
+    cam.connect()
+    ~~~~~~~~~~~^^
+  File "/home/bor3d/Documents/GitHub/ChessArm/.venv/lib/python3.13/site-packages/lerobot/cameras/opencv/camera_opencv.py", line 168, in connect
+    raise ConnectionError(
+        f"Failed to open {self}.Run `lerobot-find-cameras opencv` to find available cameras."
+    )
+ConnectionError: Failed to open OpenCVCamera(5).Run `lerobot-find-cameras opencv` to find available cameras.
 ❌ LeRobot execution failed (exit code: 1)
 ❌ LeRobot execution failed - suggestion still available
    You can try again with 'L' or execute manually and press 'C'
