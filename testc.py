@@ -819,7 +819,7 @@ def detect_board_state_color_based(warped_board, color_calib):
     return occupancy_matrix
 
 def detect_move_from_occupancy_change(prev_occupancy, curr_occupancy):
-    """Detect chess move by comparing occupancy matrices"""
+    """Detect chess move by comparing occupancy matrices - handles normal moves and captures"""
     differences = prev_occupancy != curr_occupancy
     
     # Find squares that changed
@@ -834,7 +834,7 @@ def detect_move_from_occupancy_change(prev_occupancy, curr_occupancy):
                 is_occupied = curr_occupancy[r, c]
                 changed_squares.append((square_name, was_occupied, is_occupied))
     
-    # Simple move detection: one square emptied, one filled
+    # Normal move: one square emptied, one filled (2 changes)
     if len(changed_squares) == 2:
         from_square = None
         to_square = None
@@ -848,10 +848,73 @@ def detect_move_from_occupancy_change(prev_occupancy, curr_occupancy):
         if from_square and to_square:
             return f"{from_square}{to_square}"
     
-    # Handle castling (king + rook move)
+    # Capture: only one square changes (piece moved to occupied square, replacing the piece)
+    elif len(changed_squares) == 1:
+        # This happens when a piece moves to a square that was already occupied
+        # We need to find which square became empty by comparing with expected moves
+        square_name, was_occupied, is_occupied = changed_squares[0]
+        
+        if was_occupied and is_occupied:
+            # Square was occupied and is still occupied - this could be a capture
+            # We need to find the source square by looking for missing pieces
+            # For now, return None and let the broader logic handle this
+            print(f"Possible capture detected at {square_name}")
+            return None
+        elif not was_occupied and is_occupied:
+            # Square became occupied - could be a capture destination
+            # Look for a square that became empty
+            for r in range(8):
+                for c in range(8):
+                    file_char = chr(ord('a') + c)
+                    rank_char = str(8 - r)
+                    potential_from = f"{file_char}{rank_char}"
+                    
+                    # Check if this square was occupied before but empty now
+                    if prev_occupancy[r, c] and not curr_occupancy[r, c]:
+                        # Found the source square
+                        return f"{potential_from}{square_name}"
+    
+    # Handle castling (king + rook move) - 4 changes
     elif len(changed_squares) == 4:
         # This could be castling - more complex logic needed
+        print("Possible castling detected")
         pass
+    
+    # If we can't detect a clear pattern, try alternative detection
+    # Count total pieces before and after
+    total_before = np.sum(prev_occupancy)
+    total_after = np.sum(curr_occupancy)
+    
+    if total_before > total_after:
+        # A piece was captured - total pieces decreased
+        print(f"Capture detected: {total_before} -> {total_after} pieces")
+        
+        # Find the square that became empty (source)
+        from_square = None
+        to_square = None
+        
+        for r in range(8):
+            for c in range(8):
+                file_char = chr(ord('a') + c)
+                rank_char = str(8 - r)
+                square_name = f"{file_char}{rank_char}"
+                
+                was_occupied = prev_occupancy[r, c]
+                is_occupied = curr_occupancy[r, c]
+                
+                if was_occupied and not is_occupied:
+                    from_square = square_name
+                elif not was_occupied and is_occupied:
+                    to_square = square_name
+        
+        # For captures, we might only see the source square become empty
+        # The destination might not register as "newly occupied" if detection is imperfect
+        if from_square:
+            # Try to find the most likely destination square among changed squares
+            if len(changed_squares) > 0:
+                # Use the first changed square as destination
+                dest_square, _, _ = changed_squares[0]
+                return f"{from_square}{dest_square}"
     
     return None
 
@@ -1030,6 +1093,7 @@ def main():
     print("  D = Toggle automatic move detection") 
     print("  A = Get suggested move for human")
     print("  C = Confirm move after executing it")
+    print("  K = Confirm capture (if detection missed it)")
     print("  N = New game")
     print("  R = Recalibrate board position")
     print("  T = Tune piece detection thresholds")
@@ -1108,6 +1172,25 @@ def main():
             if not np.array_equal(occupancy_matrix, previous_occupancy):
                 # Check if occupancy is consistent with a single move
                 detected_move = detect_move_from_occupancy_change(previous_occupancy, occupancy_matrix)
+                
+                # Also check if any expected move matches the current situation
+                if not detected_move and last_suggestion:
+                    # Check if the suggested move could be what happened
+                    expected_from = str(last_suggestion)[:2]
+                    expected_to = str(last_suggestion)[2:4]
+                    
+                    # Convert to matrix coordinates
+                    from_c = ord(expected_from[0]) - ord('a')
+                    from_r = 8 - int(expected_from[1])
+                    to_c = ord(expected_to[0]) - ord('a')
+                    to_r = 8 - int(expected_to[1])
+                    
+                    # Check if the from square is now empty and to square is occupied
+                    if (previous_occupancy[from_r, from_c] and not occupancy_matrix[from_r, from_c] and
+                        occupancy_matrix[to_r, to_c]):
+                        detected_move = str(last_suggestion)
+                        print(f"📍 Matched expected move: {detected_move}")
+                
                 if detected_move:
                     stable_frame_count += 1
                     if stable_frame_count >= required_stable_frames:
@@ -1118,6 +1201,13 @@ def main():
                                 # Check if this matches expected suggestion (if waiting for robot move)
                                 if waiting_for_robot_move and last_suggestion and str(move) == str(last_suggestion):
                                     print(f"✅ Robot move confirmed: {detected_move}")
+                                    
+                                    # Check if it's a capture
+                                    is_capture = current_board.is_capture(move)
+                                    if is_capture:
+                                        captured_piece = current_board.piece_at(move.to_square)
+                                        print(f"🎯 Capture! Robot took {captured_piece}")
+                                    
                                     current_board.push(move)
                                     move_counter += 1
                                     
@@ -1137,6 +1227,13 @@ def main():
                                     
                                 elif waiting_for_human_move:
                                     print(f"🎯 Human move detected: {detected_move}")
+                                    
+                                    # Check if it's a capture
+                                    is_capture = current_board.is_capture(move)
+                                    if is_capture:
+                                        captured_piece = current_board.piece_at(move.to_square)
+                                        print(f"🎯 Capture! Human took {captured_piece}")
+                                    
                                     current_board.push(move)
                                     move_counter += 1
                                     
@@ -1162,7 +1259,9 @@ def main():
                                         waiting_for_robot_move = False
                                         waiting_for_human_move = False
                                 else:
-                                    print(f"⚠️  Unexpected move detected: {detected_move} (expected: {last_suggestion})")
+                                    print(f"⚠️  Unexpected move detected: {detected_move}")
+                                    if last_suggestion:
+                                        print(f"    Expected: {last_suggestion}")
                                     stable_frame_count = 0
                             else:
                                 print(f"❌ Detected illegal move: {detected_move}")
@@ -1512,6 +1611,50 @@ def main():
                     print(f"Suggested move for human: {suggested_move}")
                     print("Execute this move on the board, then press 'c' to confirm")
                     last_suggestion = suggested_move
+        elif key == ord('k'):
+            # Confirm capture - useful when detection doesn't catch captures properly
+            if last_suggestion:
+                move = chess.Move.from_uci(str(last_suggestion))
+                if move in current_board.legal_moves:
+                    is_capture = current_board.is_capture(move)
+                    if is_capture:
+                        captured_piece = current_board.piece_at(move.to_square)
+                        print(f"🎯 Capture confirmed! Took {captured_piece}")
+                    else:
+                        print(f"📍 Move confirmed: {last_suggestion}")
+                    
+                    current_board.push(move)
+                    move_counter += 1
+                    
+                    # Update expected board state
+                    previous_occupancy = get_board_occupancy_from_chess_board(current_board)
+                    
+                    # Clear the suggestion since it's been executed
+                    last_suggestion = None
+                    last_analysis = None
+                    
+                    # Switch turns based on whose turn it is now
+                    if current_board.turn == chess.WHITE:  # Now white's turn (human)
+                        waiting_for_human_move = True
+                        waiting_for_robot_move = False
+                        print("Human's turn")
+                    else:  # Now black's turn (robot)
+                        waiting_for_human_move = False
+                        waiting_for_robot_move = True
+                        # Get robot suggestion immediately
+                        if not current_board.is_game_over():
+                            robot_move = get_stockfish_move(current_board)
+                            if robot_move:
+                                last_suggestion = robot_move
+                                last_analysis = analyze_position(current_board)
+                                print(f"Robot move: {robot_move}")
+                                print("Execute this move on the board!")
+                        else:
+                            print("🎉 Game Over!")
+                else:
+                    print("Invalid suggested move!")
+            else:
+                print("No move to confirm")
         elif key == ord('c'):
             # Confirm that a suggested move has been executed
             if last_suggestion:
