@@ -53,8 +53,7 @@
 
 <img src="MISSING PROJECT IMAGE URL" alt="Robby_Fischer_Build" width="800"/>
 
-<video here src="MISSING PROJECT IMAGE URL" alt="Robby_Fischer_Build" width="800"/>
-
+(insert video here )
 
 ---
 
@@ -64,9 +63,6 @@
 
 <img src="MISSING PROJECT IMAGE URL" alt="Robby_Fischer_Build" width="800"/>
 
-### Wiring Diagram
-
-<img src="MISSING PROJECT IMAGE URL" alt="Robby_Fischer_Build" width="800"/>
 
 
 ## BOM
@@ -109,10 +105,8 @@ Camera Input → Board Detection → Stockfish AI → Arm Execution → Repeat
 This project uses the following open-source projects
 
 - **Onshape** was used to CAD the chess pieces and board
-- **AMD** and **Hack Club** provided the following:
-  - A
-  - B
-  - C
-- Insert more later
+- **AMD** and **Hack Club** provided the hardware and software resources we used!
+- **OpenCV** was used for image processing and computer vision tasks
+- **Stockfish** was used for chess engine analysis
 
 
