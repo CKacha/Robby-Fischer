@@ -1038,7 +1038,7 @@ def execute_lerobot_move(move_type, move_string):
             "--dataset.single_task=pick up pawn and move it",
             "--dataset.repo_id=${HF_USER}/eval_act_base",
             "--dataset.root=${PWD}/eval_lerobot_datasetp/",
-            "--dataset.episode_time_s=22",
+            "--dataset.episode_time_s=20",
             "--dataset.num_episodes=1",
             "--policy.path=Bor3dguy/act_so101_e7e5pawnv3"
         ]
@@ -1609,13 +1609,25 @@ def main():
                                     waiting_for_human_move = False
                                     waiting_for_robot_move = True
                                     
-                                    print("💭 Robot's turn - getting next demo move...")
+                                    print("💭 Robot's turn - getting next move...")
                                     if not current_board.is_game_over():
-                                        robot_move = get_demo_move(current_board, demo_mode)
+                                        # After demo moves are exhausted, use Stockfish for all remaining moves
+                                        white_moves_count = len([m for m in current_board.move_stack if current_board.move_stack.index(m) % 2 == 0])
+                                        
+                                        if demo_mode and white_moves_count < len(DEMO_MOVES):
+                                            # Still in demo sequence
+                                            robot_move = get_demo_move(current_board, demo_mode)
+                                            print(f"🎭 DEMO: Robot suggestion: {robot_move}")
+                                        else:
+                                            # Demo sequence finished, switch to Stockfish
+                                            robot_move = get_stockfish_move(current_board)
+                                            if demo_mode and white_moves_count == len(DEMO_MOVES):
+                                                print("🎭 DEMO: Preset moves completed - now using Stockfish")
+                                            print(f"🤖 Stockfish suggestion: {robot_move}")
+                                        
                                         if robot_move:
                                             last_suggestion = robot_move
                                             last_analysis = analyze_position(current_board)
-                                            print(f"🤖 Robot suggestion: {robot_move}")
                                             print("Execute this move on the board!")
                                         else:
                                             print("No robot move available")
@@ -1977,6 +1989,28 @@ def main():
                         waiting_for_human_move = False
                         waiting_for_robot_move = True
                         print("Robot's turn")
+                        
+                        # Get robot suggestion immediately based on move count
+                        if not current_board.is_game_over():
+                            white_moves_count = len([m for m in current_board.move_stack if current_board.move_stack.index(m) % 2 == 0])
+                            
+                            if demo_mode and white_moves_count < len(DEMO_MOVES):
+                                # Still in demo sequence
+                                robot_move = get_demo_move(current_board, demo_mode)
+                                print(f"🎭 DEMO: Robot suggestion: {robot_move}")
+                            else:
+                                # Demo sequence finished, switch to Stockfish
+                                robot_move = get_stockfish_move(current_board)
+                                if demo_mode and white_moves_count == len(DEMO_MOVES):
+                                    print("🎭 DEMO: Preset moves completed - now using Stockfish")
+                                print(f"🤖 Stockfish suggestion: {robot_move}")
+                            
+                            if robot_move:
+                                last_suggestion = robot_move
+                                last_analysis = analyze_position(current_board)
+                                print("Execute this move on the board!")
+                        else:
+                            print("🎉 Game Over!")
                     else:  # Now black's turn (human)
                         waiting_for_human_move = True
                         waiting_for_robot_move = False
@@ -2011,13 +2045,25 @@ def main():
                         waiting_for_robot_move = True
                         print("Robot's turn")
                         
-                        # Get robot suggestion immediately
-                        robot_move = get_demo_move(current_board, demo_mode)
-                        if robot_move:
-                            last_suggestion = robot_move
-                            last_analysis = analyze_position(current_board)
-                            print(f"Robot move: {robot_move}")
-                            print("Execute this move on the board!")
+                        # Get robot suggestion immediately - check if still in demo sequence
+                        if not current_board.is_game_over():
+                            white_moves_count = len([m for m in current_board.move_stack if current_board.move_stack.index(m) % 2 == 0])
+                            
+                            if demo_mode and white_moves_count < len(DEMO_MOVES):
+                                # Still in demo sequence
+                                robot_move = get_demo_move(current_board, demo_mode)
+                                print(f"🎭 DEMO: Robot suggestion: {robot_move}")
+                            else:
+                                # Demo sequence finished or not in demo mode, use Stockfish
+                                robot_move = get_stockfish_move(current_board)
+                                if demo_mode and white_moves_count == len(DEMO_MOVES):
+                                    print("🎭 DEMO: Preset moves completed - now using Stockfish")
+                                print(f"🤖 Robot suggestion: {robot_move}")
+                            
+                            if robot_move:
+                                last_suggestion = robot_move
+                                last_analysis = analyze_position(current_board)
+                                print("Execute this move on the board!")
                     else:  # Now black's turn (human in demo mode)
                         waiting_for_human_move = True
                         waiting_for_robot_move = False
@@ -2104,11 +2150,22 @@ def main():
                         waiting_for_robot_move = True
                         # Get robot suggestion immediately
                         if not current_board.is_game_over():
-                            robot_move = get_demo_move(current_board, demo_mode)
+                            white_moves_count = len([m for m in current_board.move_stack if current_board.move_stack.index(m) % 2 == 0])
+                            
+                            if demo_mode and white_moves_count < len(DEMO_MOVES):
+                                # Still in demo sequence
+                                robot_move = get_demo_move(current_board, demo_mode)
+                                print(f"🎭 DEMO: Robot suggestion: {robot_move}")
+                            else:
+                                # Demo sequence finished, switch to Stockfish
+                                robot_move = get_stockfish_move(current_board)
+                                if demo_mode and white_moves_count == len(DEMO_MOVES):
+                                    print("🎭 DEMO: Preset moves completed - now using Stockfish")
+                                print(f"🤖 Stockfish suggestion: {robot_move}")
+                            
                             if robot_move:
                                 last_suggestion = robot_move
                                 last_analysis = analyze_position(current_board)
-                                print(f"Robot move: {robot_move}")
                                 print("Execute this move on the board!")
                         else:
                             print("🎉 Game Over!")
@@ -2149,11 +2206,22 @@ def main():
                     waiting_for_robot_move = True
                     # Get robot suggestion immediately
                     if not current_board.is_game_over():
-                        robot_move = get_demo_move(current_board, demo_mode)
+                        white_moves_count = len([m for m in current_board.move_stack if current_board.move_stack.index(m) % 2 == 0])
+                        
+                        if demo_mode and white_moves_count < len(DEMO_MOVES):
+                            # Still in demo sequence
+                            robot_move = get_demo_move(current_board, demo_mode)
+                            print(f"🎭 DEMO: Robot suggestion: {robot_move}")
+                        else:
+                            # Demo sequence finished, switch to Stockfish
+                            robot_move = get_stockfish_move(current_board)
+                            if demo_mode and white_moves_count == len(DEMO_MOVES):
+                                print("🎭 DEMO: Preset moves completed - now using Stockfish")
+                            print(f"🤖 Stockfish suggestion: {robot_move}")
+                        
                         if robot_move:
                             last_suggestion = robot_move
                             last_analysis = analyze_position(current_board)
-                            print(f"Robot move: {robot_move}")
                             print("Execute this move on the board!")
                     else:
                         print("🎉 Game Over!")
