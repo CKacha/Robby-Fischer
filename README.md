@@ -6,7 +6,6 @@
   <br>
 </h1>
 
-
 <h4 align="center">
   
 Robby Fischer is a chess-playing robotic arm system that uses computer vision and imitation Learning AI to play chess autonomously against human opponents!
@@ -25,16 +24,18 @@ Robby Fischer is a chess-playing robotic arm system that uses computer vision an
   <a href="#Features">Features</a> •
   <a href="#Algorithim">Algorithim</a> •
   <a href="#credits">Credits</a> •
-  <a href="#license">License</a>
 </p>
 
+<img src="notdone" alt="Robby_Fischer_Build" width="800"/>
+
+## Overview
+
 ChessArm is an intelligent chess system that:
-- **Captures** the board state using multiple cameras that track the 
+- **Captures** the board state using multiple cameras that track the position of the arm and chess board
 - **Detects** opponent moves via vision-based piece tracking
 - **Analyzes** the board using Stockfish chess engine
-- **Executes** moves with a Le Robot arm
-- **Verifies** move completion through visual feedback
-
+- **Executes** chess moves using the [Hugging Face LeRobot SO‑ARM101 arm](https://github.com/huggingface/lerobot)
+  
 **Game Flow**: Camera Input → Board Detection → Stockfish AI → Arm Execution → Repeat
 
 ## Features
@@ -45,10 +46,21 @@ ChessArm is an intelligent chess system that:
 - **AI Integration**: Stockfish engine for optimal move suggestions (2-second time limit)
 - **Turn-Based Logic**: Automatic alternation between robot (Red) and opponent (White)
 
+## Algorithm
 
-## Setup
-It uses a {} set up overhead to check the chessboard, and a [] to look at the LeRobot Arm for (). 
+insert img when chris done
 
-Chess-playing robot arm system:
-Camera -> Board State (FEN) -> Stockfish -> Plan -> Robot Macros -> Verify -> Repeat
+## Credits
+
+This project uses the following open-source projects
+
+- **Onshape** was used to CAD the chess pieces and board
+- **AMD** and **Hack Club** provided the following:
+  - A
+  - B
+  - C
+- Insert more later
+
+ 
+-  
 
