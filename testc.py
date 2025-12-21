@@ -876,8 +876,13 @@ def detect_move_from_occupancy_change(prev_occupancy, curr_occupancy):
                 is_occupied = curr_occupancy[r, c]
                 changed_squares.append((square_name, was_occupied, is_occupied))
     
-    # Normal move: one square emptied, one filled (2 changes)
-    if len(changed_squares) == 2:
+    # Count total pieces before and after
+    total_before = np.sum(prev_occupancy)
+    total_after = np.sum(curr_occupancy)
+    piece_difference = total_before - total_after
+    
+    # Normal move: one square emptied, one filled (2 changes, same piece count)
+    if len(changed_squares) == 2 and piece_difference == 0:
         from_square = None
         to_square = None
         
@@ -890,73 +895,35 @@ def detect_move_from_occupancy_change(prev_occupancy, curr_occupancy):
         if from_square and to_square:
             return f"{from_square}{to_square}"
     
-    # Capture: only one square changes (piece moved to occupied square, replacing the piece)
-    elif len(changed_squares) == 1:
-        # This happens when a piece moves to a square that was already occupied
-        # We need to find which square became empty by comparing with expected moves
-        square_name, was_occupied, is_occupied = changed_squares[0]
-        
-        if was_occupied and is_occupied:
-            # Square was occupied and is still occupied - this could be a capture
-            # We need to find the source square by looking for missing pieces
-            # For now, return None and let the broader logic handle this
-            print(f"Possible capture detected at {square_name}")
-            return None
-        elif not was_occupied and is_occupied:
-            # Square became occupied - could be a capture destination
-            # Look for a square that became empty
-            for r in range(8):
-                for c in range(8):
-                    file_char = chr(ord('a') + c)
-                    rank_char = str(8 - r)
-                    potential_from = f"{file_char}{rank_char}"
-                    
-                    # Check if this square was occupied before but empty now
-                    if prev_occupancy[r, c] and not curr_occupancy[r, c]:
-                        # Found the source square
-                        return f"{potential_from}{square_name}"
-    
-    # Handle castling (king + rook move) - 4 changes
-    elif len(changed_squares) == 4:
-        # This could be castling - more complex logic needed
-        print("Possible castling detected")
-        pass
-    
-    # If we can't detect a clear pattern, try alternative detection
-    # Count total pieces before and after
-    total_before = np.sum(prev_occupancy)
-    total_after = np.sum(curr_occupancy)
-    
-    if total_before > total_after:
-        # A piece was captured - total pieces decreased
-        print(f"Capture detected: {total_before} -> {total_after} pieces")
-        
-        # Find the square that became empty (source)
+    # TRUE CAPTURE: piece count decreased by exactly 1
+    elif piece_difference == 1:
+        # Find the source square (became empty) and destination square
         from_square = None
         to_square = None
         
-        for r in range(8):
-            for c in range(8):
-                file_char = chr(ord('a') + c)
-                rank_char = str(8 - r)
-                square_name = f"{file_char}{rank_char}"
-                
-                was_occupied = prev_occupancy[r, c]
-                is_occupied = curr_occupancy[r, c]
-                
-                if was_occupied and not is_occupied:
-                    from_square = square_name
-                elif not was_occupied and is_occupied:
-                    to_square = square_name
+        for square, was_occupied, is_occupied in changed_squares:
+            if was_occupied and not is_occupied:  # Square became empty
+                from_square = square
+            elif not was_occupied and is_occupied:  # Square became occupied  
+                to_square = square
         
-        # For captures, we might only see the source square become empty
-        # The destination might not register as "newly occupied" if detection is imperfect
+        # For captures, we might only see the source square change if destination
+        # square detection is imperfect (piece replaced another piece)
         if from_square:
-            # Try to find the most likely destination square among changed squares
-            if len(changed_squares) > 0:
-                # Use the first changed square as destination
-                dest_square, _, _ = changed_squares[0]
-                return f"{from_square}{dest_square}"
+            # If we have a clear destination, use it
+            if to_square:
+                return f"{from_square}{to_square}"
+            
+            # Otherwise, look for any square that could be the destination
+            # among the changed squares or nearby occupied squares
+            for square, was_occupied, is_occupied in changed_squares:
+                if is_occupied:  # Any square that's now occupied could be destination
+                    return f"{from_square}{square}"
+    
+    # Handle castling (king + rook move) - 4 changes, same piece count
+    elif len(changed_squares) == 4 and piece_difference == 0:
+        print("Possible castling detected")
+        pass
     
     return None
 
