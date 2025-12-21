@@ -57,9 +57,7 @@
 
 ---
 
-## Diagrams
-
-### Algorithm Diagram
+## Algorithm Diagram
 
 <img src="MISSING PROJECT IMAGE URL" alt="Robby_Fischer_Build" width="800"/>
 
@@ -68,12 +66,10 @@
 ## BOM
 
 - Hugging Face LeRobot SO-ARM101
-- AMD AI PC (Ryzen AI)
+- AMD PC
 - USB Cameras (x3)
-- Chess Board
+- Chess Board (3D printed)
 - Chess Pieces (3D printed)
-- Power Supply
-- Misc. wiring and mounts
 
 ---
 
