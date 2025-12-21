@@ -1,9 +1,173 @@
-lerobot-teleoperate \
-    --robot.type=so101_follower \
-    --robot.port=/dev/ttyACM1 \
-    --robot.id=my_awesome_follower_arm \
-    --robot.cameras="{wrist: {type: opencv, index_or_path: 5, width: 640, height: 480, fps: 30}, corner: {type: opencv, index_or_path: 2, width: 640, height: 480, fps: 30}, top: {type: opencv, index_or_path: 10, width: 640, height: 480, fps: 30}, side: {type: opencv, index_or_path: 6, width: 640, height: 480, fps: 30}}" \
-    --teleop.type=so101_leader \
-    --teleop.port=/dev/ttyACM0 \
-    --teleop.id=my_awesome_leader_arm \
-    --display_data=true
+  --dataset.num_episodes=1 \
+  --policy.path=Bor3dguy/act_so101_e7e5pawnv3
+
+🚀 Starting LeRobot execution...
+   (This will control the robot arm to execute the move)
+   Press Ctrl+C to abort if needed
+
+📷 Pausing GUI cameras to avoid conflicts...
+🔄 Camera 5 released for LeRobot
+🔄 Camera 10 released for LeRobot
+🔄 Camera 6 released for LeRobot
+WARNING:root:No accelerated backend detected. Using default cpu, this will be slow.
+WARNING:lerobot.configs.policies:Device 'cuda' is not available. Switching to 'cpu'.
+WARNING:root:No accelerated backend detected. Using default cpu, this will be slow.
+WARNING:lerobot.configs.policies:Device 'cuda' is not available. Switching to 'cpu'.
+INFO 2025-12-21 14:30:49 t_record.py:375 {'dataset': {'episode_time_s': 120,
+             'fps': 30,
+             'num_episodes': 1,
+             'num_image_writer_processes': 0,
+             'num_image_writer_threads_per_camera': 4,
+             'private': False,
+             'push_to_hub': True,
+             'rename_map': {},
+             'repo_id': 'default_user/eval_act_base',
+             'reset_time_s': 60,
+             'root': '/home/bor3d/Documents/GitHub/ChessArm/eval_lerobot_datasetp/',
+             'single_task': 'pick up pawn and move it',
+             'tags': None,
+             'video': True,
+             'video_encoding_batch_size': 1},
+ 'display_data': False,
+ 'play_sounds': True,
+ 'policy': {'chunk_size': 100,
+            'device': 'cpu',
+            'dim_feedforward': 3200,
+            'dim_model': 512,
+            'dropout': 0.1,
+            'feedforward_activation': 'relu',
+            'input_features': {'observation.images.corner': {'shape': (3,
+                                                                       480,
+                                                                       640),
+                                                             'type': <FeatureType.VISUAL: 'VISUAL'>},
+                               'observation.images.side': {'shape': (3,
+                                                                     480,
+                                                                     640),
+                                                           'type': <FeatureType.VISUAL: 'VISUAL'>},
+                               'observation.images.top': {'shape': (3,
+                                                                    480,
+                                                                    640),
+                                                          'type': <FeatureType.VISUAL: 'VISUAL'>},
+                               'observation.images.wrist': {'shape': (3,
+                                                                      480,
+                                                                      640),
+                                                            'type': <FeatureType.VISUAL: 'VISUAL'>},
+                               'observation.state': {'shape': (6,),
+                                                     'type': <FeatureType.STATE: 'STATE'>}},
+            'kl_weight': 10.0,
+            'latent_dim': 32,
+            'license': None,
+            'n_action_steps': 100,
+            'n_decoder_layers': 1,
+            'n_encoder_layers': 4,
+            'n_heads': 8,
+            'n_obs_steps': 1,
+            'n_vae_encoder_layers': 4,
+            'normalization_mapping': {'ACTION': <NormalizationMode.MEAN_STD: 'MEAN_STD'>,
+                                      'STATE': <NormalizationMode.MEAN_STD: 'MEAN_STD'>,
+                                      'VISUAL': <NormalizationMode.MEAN_STD: 'MEAN_STD'>},
+            'optimizer_lr': 1e-05,
+            'optimizer_lr_backbone': 1e-05,
+            'optimizer_weight_decay': 0.0001,
+            'output_features': {'action': {'shape': (6,),
+                                           'type': <FeatureType.ACTION: 'ACTION'>}},
+            'pre_norm': False,
+            'pretrained_backbone_weights': 'ResNet18_Weights.IMAGENET1K_V1',
+            'pretrained_path': 'Bor3dguy/act_so101_e7e5pawnv3',
+            'private': None,
+            'push_to_hub': True,
+            'replace_final_stride_with_dilation': 0,
+            'repo_id': 'Bor3dguy/act_so101_e7e5pawnv3',
+            'tags': None,
+            'temporal_ensemble_coeff': None,
+            'use_amp': False,
+            'use_vae': True,
+            'vision_backbone': 'resnet18'},
+ 'resume': False,
+ 'robot': {'calibration_dir': None,
+           'cameras': {'corner': {'color_mode': <ColorMode.RGB: 'rgb'>,
+                                  'fourcc': None,
+                                  'fps': 30,
+                                  'height': 480,
+                                  'index_or_path': 2,
+                                  'rotation': <Cv2Rotation.NO_ROTATION: 0>,
+                                  'warmup_s': 1,
+                                  'width': 640},
+                       'side': {'color_mode': <ColorMode.RGB: 'rgb'>,
+                                'fourcc': None,
+                                'fps': 30,
+                                'height': 480,
+                                'index_or_path': 6,
+                                'rotation': <Cv2Rotation.NO_ROTATION: 0>,
+                                'warmup_s': 1,
+                                'width': 640},
+                       'top': {'color_mode': <ColorMode.RGB: 'rgb'>,
+                               'fourcc': None,
+                               'fps': 30,
+                               'height': 480,
+                               'index_or_path': 10,
+                               'rotation': <Cv2Rotation.NO_ROTATION: 0>,
+                               'warmup_s': 1,
+                               'width': 640},
+                       'wrist': {'color_mode': <ColorMode.RGB: 'rgb'>,
+                                 'fourcc': None,
+                                 'fps': 30,
+                                 'height': 480,
+                                 'index_or_path': 5,
+                                 'rotation': <Cv2Rotation.NO_ROTATION: 0>,
+                                 'warmup_s': 1,
+                                 'width': 640}},
+           'disable_torque_on_disconnect': True,
+           'id': 'my_awesome_follower_arm',
+           'max_relative_target': None,
+           'port': '/dev/ttyACM1',
+           'use_degrees': False},
+ 'teleop': None}
+INFO 2025-12-21 14:30:51 a_opencv.py:180 OpenCVCamera(5) connected.
+INFO 2025-12-21 14:30:52 a_opencv.py:180 OpenCVCamera(2) connected.
+INFO 2025-12-21 14:30:53 a_opencv.py:180 OpenCVCamera(10) connected.
+INFO 2025-12-21 14:30:54 a_opencv.py:180 OpenCVCamera(6) connected.
+Traceback (most recent call last):
+  File "/home/bor3d/Documents/GitHub/ChessArm/.venv/bin/lerobot-record", line 7, in <module>
+    sys.exit(main())
+             ~~~~^^
+  File "/home/bor3d/Documents/GitHub/ChessArm/.venv/lib/python3.13/site-packages/lerobot/scripts/lerobot_record.py", line 516, in main
+    record()
+    ~~~~~~^^
+  File "/home/bor3d/Documents/GitHub/ChessArm/.venv/lib/python3.13/site-packages/lerobot/configs/parser.py", line 233, in wrapper_inner
+    response = fn(cfg, *args, **kwargs)
+  File "/home/bor3d/Documents/GitHub/ChessArm/.venv/lib/python3.13/site-packages/lerobot/scripts/lerobot_record.py", line 442, in record
+    robot.connect()
+    ~~~~~~~~~~~~~^^
+  File "/home/bor3d/Documents/GitHub/ChessArm/.venv/lib/python3.13/site-packages/lerobot/robots/so101_follower/so101_follower.py", line 103, in connect
+    self.configure()
+    ~~~~~~~~~~~~~~^^
+  File "/home/bor3d/Documents/GitHub/ChessArm/.venv/lib/python3.13/site-packages/lerobot/robots/so101_follower/so101_follower.py", line 150, in configure
+    with self.bus.torque_disabled():
+         ~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/home/bor3d/miniconda3/lib/python3.13/contextlib.py", line 148, in __exit__
+    next(self.gen)
+    ~~~~^^^^^^^^^^
+  File "/home/bor3d/Documents/GitHub/ChessArm/.venv/lib/python3.13/site-packages/lerobot/motors/motors_bus.py", line 597, in torque_disabled
+    self.enable_torque(motors)
+    ~~~~~~~~~~~~~~~~~~^^^^^^^^
+  File "/home/bor3d/Documents/GitHub/ChessArm/.venv/lib/python3.13/site-packages/lerobot/motors/feetech/feetech.py", line 310, in enable_torque
+    self.write("Lock", motor, 1, num_retry=num_retry)
+    ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/bor3d/Documents/GitHub/ChessArm/.venv/lib/python3.13/site-packages/lerobot/motors/motors_bus.py", line 1017, in write
+    self._write(addr, length, id_, value, num_retry=num_retry, raise_on_error=True, err_msg=err_msg)
+    ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/bor3d/Documents/GitHub/ChessArm/.venv/lib/python3.13/site-packages/lerobot/motors/motors_bus.py", line 1041, in _write
+    raise ConnectionError(f"{err_msg} {self.packet_handler.getTxRxResult(comm)}")
+ConnectionError: Failed to write 'Lock' on id_=3 with '1' after 1 tries. [TxRxResult] Incorrect status packet!
+
+📷 Resuming GUI cameras...
+🔄 Reconnecting camera 5...
+🔄 Reconnecting camera 6...
+🔄 Reconnecting camera 10...
+✅ Camera 5 reconnected
+✅ Camera 6 reconnected
+✅ Camera 10 reconnected
+❌ LeRobot execution failed (exit code: 1)
+❌ LeRobot execution failed - suggestion still available
+   You can try again with 'L' or execute manually and press 'C'
