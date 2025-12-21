@@ -37,7 +37,9 @@
 ### Our Team!
 
 **Team Name:** TPC 
+
 **Team Number:** 18
+
 **GitHub Usernames:**  
 - @TaniWanKenobi
 - @techn1-cal  
