@@ -873,10 +873,15 @@ def main():
     move_counter = 0
     # Track board state for move detection
     previous_occupancy = get_expected_starting_occupancy()
-    human_to_move = True  # Human goes first
-    move_detection_active = False
+    move_detection_active = True  # Start with detection active
     stable_frame_count = 0
-    required_stable_frames = 30  # Require 30 stable frames before detecting move
+    required_stable_frames = 15  # Reduced for faster response
+    
+    # Game state tracking
+    waiting_for_human_move = True  # Human goes first
+    waiting_for_robot_move = False
+    last_detected_occupancy = None
+    move_just_detected = False
     
     # Load color calibration if available
     color_calib = load_piece_color_calibration()
@@ -886,7 +891,7 @@ def main():
         print("No color calibration found - you can create one with 'P'")
     
     print(f"Game started! Expected starting position:")
-    print(f"Human (White) to move first")
+    print(f"Human (White) goes first - make your move!")
     print(f"Robot will play as Black")
 
     while True:
@@ -912,11 +917,9 @@ def main():
 
         # Move detection logic
         detected_move = None
-        if move_detection_active:
-            # Check if current occupancy is stable for required frames
-            if np.array_equal(occupancy_matrix, previous_occupancy):
-                stable_frame_count = 0  # Reset if no change
-            else:
+        if move_detection_active and not current_board.is_game_over():
+            # Check if current occupancy is different from previous
+            if not np.array_equal(occupancy_matrix, previous_occupancy):
                 # Check if occupancy is consistent with a single move
                 detected_move = detect_move_from_occupancy_change(previous_occupancy, occupancy_matrix)
                 if detected_move:
@@ -926,44 +929,65 @@ def main():
                         try:
                             move = chess.Move.from_uci(detected_move)
                             if move in current_board.legal_moves:
-                                current_board.push(move)
-                                move_counter += 1
-                                print(f"Detected human move: {detected_move}")
-                                
-                                # Update tracking state
-                                previous_occupancy = occupancy_matrix.copy()
-                                
-                                # Get robot response
-                                if not current_board.is_game_over():
-                                    robot_move = get_stockfish_move(current_board)
-                                    if robot_move:
-                                        print(f"Robot plays: {robot_move}")
-                                        current_board.push(robot_move)
-                                        move_counter += 1
-                                        
-                                        # TODO: Send robot_move to robot arm controller
-                                        print("TODO: Execute robot move with arm")
-                                        
-                                        # Update expected occupancy after robot move
-                                        # For now, we'll wait for visual confirmation
-                                        human_to_move = True
-                                        move_detection_active = False
-                                        
-                                        # Get new analysis
-                                        last_suggestion = get_stockfish_move(current_board)
-                                        last_analysis = analyze_position(current_board)
+                                # Check if this matches expected suggestion (if waiting for robot move)
+                                if waiting_for_robot_move and last_suggestion and str(move) == str(last_suggestion):
+                                    print(f"✅ Robot move confirmed: {detected_move}")
+                                    current_board.push(move)
+                                    move_counter += 1
+                                    
+                                    # Clear suggestion since it was implemented
+                                    last_suggestion = None
+                                    last_analysis = None
+                                    
+                                    # Update tracking state
+                                    previous_occupancy = occupancy_matrix.copy()
+                                    stable_frame_count = 0
+                                    
+                                    # Switch to waiting for human move
+                                    waiting_for_robot_move = False
+                                    waiting_for_human_move = True
+                                    
+                                    print("💭 Waiting for human move...")
+                                    
+                                elif waiting_for_human_move:
+                                    print(f"🎯 Human move detected: {detected_move}")
+                                    current_board.push(move)
+                                    move_counter += 1
+                                    
+                                    # Update tracking state
+                                    previous_occupancy = occupancy_matrix.copy()
+                                    stable_frame_count = 0
+                                    
+                                    # Switch to robot turn - get suggestion immediately
+                                    waiting_for_human_move = False
+                                    waiting_for_robot_move = True
+                                    
+                                    if not current_board.is_game_over():
+                                        robot_move = get_stockfish_move(current_board)
+                                        if robot_move:
+                                            last_suggestion = robot_move
+                                            last_analysis = analyze_position(current_board)
+                                            print(f"🤖 Robot suggestion: {robot_move}")
+                                            print("Execute this move on the board!")
+                                        else:
+                                            print("No robot move available")
+                                    else:
+                                        print("🎉 Game Over!")
+                                        waiting_for_robot_move = False
+                                        waiting_for_human_move = False
                                 else:
-                                    print("Game Over!")
-                                
-                                stable_frame_count = 0
+                                    print(f"⚠️  Unexpected move detected: {detected_move} (expected: {last_suggestion})")
+                                    stable_frame_count = 0
                             else:
-                                print(f"Detected illegal move: {detected_move}")
+                                print(f"❌ Detected illegal move: {detected_move}")
                                 stable_frame_count = 0
-                        except:
-                            print(f"Invalid move format: {detected_move}")
+                        except Exception as e:
+                            print(f"❌ Invalid move format: {detected_move} - {e}")
                             stable_frame_count = 0
                 else:
                     stable_frame_count = 0
+            else:
+                stable_frame_count = 0
 
         sq = BOARD_SIZE // 8
         
@@ -1054,15 +1078,23 @@ def main():
                 cv2.putText(analysis_img, score_text, (10, 180), 
                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 0), 2)
         
+        # Show whose turn it is
+        if waiting_for_human_move:
+            cv2.putText(analysis_img, "Waiting for HUMAN move", (10, 220), 
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+        elif waiting_for_robot_move:
+            cv2.putText(analysis_img, "Execute ROBOT move!", (10, 220), 
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 0, 255), 2)
+        
         # Show game status
         if current_board.is_checkmate():
-            cv2.putText(analysis_img, "CHECKMATE!", (10, 220), 
+            cv2.putText(analysis_img, "CHECKMATE!", (10, 250), 
                        cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
         elif current_board.is_check():
-            cv2.putText(analysis_img, "CHECK!", (10, 220), 
+            cv2.putText(analysis_img, "CHECK!", (10, 250), 
                        cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 0, 0), 2)
         elif current_board.is_stalemate():
-            cv2.putText(analysis_img, "STALEMATE", (10, 220), 
+            cv2.putText(analysis_img, "STALEMATE", (10, 250), 
                        cv2.FONT_HERSHEY_SIMPLEX, 0.8, (128, 128, 128), 2)
         
         # Show recent moves
@@ -1182,13 +1214,29 @@ def main():
                 else:
                     print("No camera frame available")
         elif key == ord('s'):
-            print("\nGetting Stockfish suggestion...")
-            last_suggestion = get_stockfish_move(current_board)
-            last_analysis = analyze_position(current_board)
-            if last_suggestion:
-                print(f"Stockfish suggests: {last_suggestion}")
+            if waiting_for_human_move and not last_suggestion:
+                print("\nGetting Stockfish suggestion for human...")
+                human_suggestion = get_stockfish_move(current_board)
+                if human_suggestion:
+                    print(f"Suggested move for human: {human_suggestion}")
+                    # Don't set last_suggestion for human moves, just display
+                else:
+                    print("No suggestion available")
+            elif waiting_for_robot_move and not last_suggestion:
+                print("\nGetting robot move...")
+                robot_move = get_stockfish_move(current_board)
+                if robot_move:
+                    last_suggestion = robot_move
+                    last_analysis = analyze_position(current_board)
+                    print(f"Robot move: {robot_move}")
+                    print("Execute this move on the board!")
+                else:
+                    print("No robot move available")
             else:
-                print("No suggestion available")
+                if last_suggestion:
+                    print(f"Current suggestion: {last_suggestion}")
+                else:
+                    print("No suggestion needed right now")
         elif key == ord('m'):
             print("\nEnter move (e.g., e2e4): ", end="")
             move_input = input()
@@ -1200,12 +1248,27 @@ def main():
                     print(f"Move {move_input} played!")
                     
                     # Update expected board state after manual move
-                    # For simplicity, we'll assume the physical board matches the game state
                     previous_occupancy = get_board_occupancy_from_chess_board(current_board)
                     
-                    # Get new suggestion after move
-                    last_suggestion = get_stockfish_move(current_board)
-                    last_analysis = analyze_position(current_board)
+                    # Clear any existing suggestion since we made a manual move
+                    last_suggestion = None
+                    last_analysis = None
+                    
+                    # Switch turns based on whose turn it is now
+                    if current_board.turn == chess.WHITE:  # Now white's turn (human)
+                        waiting_for_human_move = True
+                        waiting_for_robot_move = False
+                        print("Human's turn")
+                    else:  # Now black's turn (robot)
+                        waiting_for_human_move = False
+                        waiting_for_robot_move = True
+                        # Get robot suggestion immediately
+                        robot_move = get_stockfish_move(current_board)
+                        if robot_move:
+                            last_suggestion = robot_move
+                            last_analysis = analyze_position(current_board)
+                            print(f"Robot move: {robot_move}")
+                            print("Execute this move on the board!")
                 else:
                     print("Illegal move!")
             except:
@@ -1217,15 +1280,19 @@ def main():
             last_suggestion = None
             last_analysis = None
             previous_occupancy = get_expected_starting_occupancy()
-            human_to_move = True
-            move_detection_active = False
+            waiting_for_human_move = True
+            waiting_for_robot_move = False
+            move_detection_active = True
             stable_frame_count = 0
+            print("Human (White) goes first - make your move!")
         elif key == ord('d'):
             # Toggle move detection
             move_detection_active = not move_detection_active
             print(f"Move detection: {'ON' if move_detection_active else 'OFF'}")
             if move_detection_active:
-                print("Waiting for human move...")
+                print("Move detection enabled - system will automatically detect moves")
+            else:
+                print("Move detection disabled - use 'M' for manual moves or 'C' to confirm moves")
         elif key == ord('a'):
             # Auto-play mode: get Stockfish suggestion and execute
             if current_board.turn:  # White's turn
@@ -1237,32 +1304,38 @@ def main():
                     last_suggestion = suggested_move
         elif key == ord('c'):
             # Confirm that a suggested move has been executed
-            if last_suggestion and current_board.turn:
-                print(f"Confirming human move: {last_suggestion}")
+            if last_suggestion:
+                print(f"Confirming move: {last_suggestion}")
                 current_board.push(last_suggestion)
                 move_counter += 1
                 
                 # Update expected board state
                 previous_occupancy = get_board_occupancy_from_chess_board(current_board)
                 
-                # Get robot response
-                if not current_board.is_game_over():
-                    robot_move = get_stockfish_move(current_board)
-                    if robot_move:
-                        print(f"Robot plays: {robot_move}")
-                        current_board.push(robot_move)
-                        move_counter += 1
-                        
-                        # TODO: Send robot_move to robot arm controller
-                        print("TODO: Execute robot move with arm")
-                        
-                        # Update for next human turn
-                        last_suggestion = get_stockfish_move(current_board)
-                        last_analysis = analyze_position(current_board)
-                else:
-                    print("Game Over!")
+                # Clear the suggestion since it's been executed
+                last_suggestion = None
+                last_analysis = None
+                
+                # Switch turns based on whose turn it is now
+                if current_board.turn == chess.WHITE:  # Now white's turn (human)
+                    waiting_for_human_move = True
+                    waiting_for_robot_move = False
+                    print("Human's turn")
+                else:  # Now black's turn (robot)
+                    waiting_for_human_move = False
+                    waiting_for_robot_move = True
+                    # Get robot suggestion immediately
+                    if not current_board.is_game_over():
+                        robot_move = get_stockfish_move(current_board)
+                        if robot_move:
+                            last_suggestion = robot_move
+                            last_analysis = analyze_position(current_board)
+                            print(f"Robot move: {robot_move}")
+                            print("Execute this move on the board!")
+                    else:
+                        print("🎉 Game Over!")
             else:
-                print("No move to confirm or not human's turn")
+                print("No move to confirm")
 
     # Stop capture threads
     stop_capture = True
