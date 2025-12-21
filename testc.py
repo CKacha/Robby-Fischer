@@ -6,6 +6,9 @@ import chess
 import chess.engine
 import threading
 import time
+import subprocess
+import sys
+import select
 
 # =========================
 # CONFIG
@@ -1017,6 +1020,7 @@ def execute_lerobot_move(move_type, move_string):
     move_type: "pawn", "knight", "bishop", etc.
     move_string: the chess move in UCI format (e.g., "e2e4")
     """
+    global pause_cameras
     
     print(f"\n🤖 EXECUTING LEROBOT MOVE: {move_type.upper()} - {move_string}")
     print("CALLS:")
@@ -1088,6 +1092,11 @@ def execute_lerobot_move(move_type, move_string):
         print("   Press Ctrl+C to abort if needed")
         print("")
         
+        # **PAUSE CAMERAS BEFORE EXECUTION**
+        print("📷 Pausing GUI cameras to avoid conflicts...")
+        pause_cameras = True
+        time.sleep(2)  # Give cameras time to release
+        
         # Execute the command - expand environment variables
         import os
         expanded_cmd = []
@@ -1101,7 +1110,12 @@ def execute_lerobot_move(move_type, move_string):
                 arg = arg.replace("${PWD}", pwd)
             expanded_cmd.append(arg)
         
-        result = subprocess.run(expanded_cmd, capture_output=False, text=True, timeout=300)  # 5 minute timeout
+        result = subprocess.run(expanded_cmd, capture_output=False, text=True, timeout=180)  # 3 minute timeout
+        
+        # **RESUME CAMERAS AFTER EXECUTION**
+        print("\n📷 Resuming GUI cameras...")
+        pause_cameras = False
+        time.sleep(3)  # Give cameras time to reconnect
         
         if result.returncode == 0:
             print("✅ LeRobot execution completed successfully!")
@@ -1112,17 +1126,25 @@ def execute_lerobot_move(move_type, move_string):
             return False
             
     except subprocess.TimeoutExpired:
-        print("⏰ LeRobot execution timed out (5 minutes)")
+        print("⏰ LeRobot execution timed out (3 minutes)")
+        # Resume cameras even on timeout
+        pause_cameras = False
         return False
     except KeyboardInterrupt:
         print("\n🛑 LeRobot execution interrupted by user")
+        # Resume cameras even on interrupt
+        pause_cameras = False
         return False
     except FileNotFoundError:
         print("❌ LeRobot not found! Make sure lerobot is installed and in PATH")
         print("   Install with: pip install lerobot")
+        # Resume cameras
+        pause_cameras = False
         return False
     except Exception as e:
         print(f"❌ Unexpected error during LeRobot execution: {e}")
+        # Resume cameras even on error
+        pause_cameras = False
         return False
 
 def get_move_type(move_string, board):
@@ -1221,9 +1243,10 @@ def analyze_position(current_board, depth=15):
 # =========================
 
 stop_capture = False
+pause_cameras = False  # New flag to pause cameras during LeRobot execution
 
 def capture_frames(camera_idx, array_idx, frame_array):
-    global stop_capture
+    global stop_capture, pause_cameras
     cap = cv2.VideoCapture(camera_idx)
     
     if not cap.isOpened():
@@ -1237,13 +1260,37 @@ def capture_frames(camera_idx, array_idx, frame_array):
     print(f"Successfully opened camera {camera_idx}")
 
     while not stop_capture:
-        ret, frame = cap.read()
-        if ret:
-            with frame_lock:
-                frame_array[array_idx] = frame
+        if pause_cameras:
+            # Release camera during LeRobot execution
+            cap.release()
+            print(f"🔄 Camera {camera_idx} released for LeRobot")
+            
+            # Wait until pause is lifted
+            while pause_cameras and not stop_capture:
+                time.sleep(0.5)
+            
+            if stop_capture:
+                break
+                
+            # Reconnect camera after pause
+            print(f"🔄 Reconnecting camera {camera_idx}...")
+            cap = cv2.VideoCapture(camera_idx)
+            if cap.isOpened():
+                cap.set(cv2.CAP_PROP_FRAME_WIDTH, FRAME_WIDTH)
+                cap.set(cv2.CAP_PROP_FRAME_HEIGHT, FRAME_HEIGHT)
+                cap.set(cv2.CAP_PROP_FPS, FPS)
+                print(f"✅ Camera {camera_idx} reconnected")
+            else:
+                print(f"❌ Failed to reconnect camera {camera_idx}")
+                break
         else:
-            print(f"Error capturing frame from camera {camera_idx}")
-            time.sleep(0.1)  # Brief pause before retry
+            ret, frame = cap.read()
+            if ret:
+                with frame_lock:
+                    frame_array[array_idx] = frame
+            else:
+                print(f"Error capturing frame from camera {camera_idx}")
+                time.sleep(0.1)  # Brief pause before retry
 
     cap.release()
     print(f"Released camera {camera_idx}")
@@ -1402,8 +1449,23 @@ def main():
     while True:
         # Lock frames to avoid concurrent access issues
         with frame_lock:
-            # Check if any frame is None
-            if any(frame is None for frame in frames):
+            # Check if any frame is None or cameras are paused
+            if pause_cameras or any(frame is None for frame in frames):
+                if pause_cameras:
+                    # Show placeholder message during LeRobot execution
+                    if gui_available:
+                        placeholder = np.zeros((600, 800, 3), dtype=np.uint8)
+                        cv2.putText(placeholder, "🤖 LEROBOT EXECUTING...", (50, 200), 
+                                   cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 255, 255), 3)
+                        cv2.putText(placeholder, "Cameras paused during robot execution", (50, 300), 
+                                   cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
+                        cv2.putText(placeholder, "Will resume automatically when complete", (50, 350), 
+                                   cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
+                        cv2.imshow("board", placeholder)
+                        cv2.imshow("camera views", np.zeros((300, 900, 3), dtype=np.uint8))
+                else:
+                    # Waiting for camera initialization
+                    pass
                 continue
 
             top_view = frames[1].copy()
