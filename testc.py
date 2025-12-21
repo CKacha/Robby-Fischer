@@ -1066,7 +1066,7 @@ def execute_lerobot_move(move_type, move_string):
             "--robot.type=so101_follower",
             "--robot.port=/dev/ttyACM1",
             "--robot.id=my_awesome_follower_arm",
-            '--robot.cameras="{wrist: {type: opencv, index_or_path: 5, width: 640, height: 480, fps: 30}, corner: {type: opencv, index_or_path: 2, width: 640, height: 480, fps: 30}, top: {type: opencv, index_or_path: 10, width: 640, height: 480, fps: 30}, side: {type: opencv, index_or_path: 6, width: 640, height: 480, fps: 30}}"',
+            '--robot.cameras={"wrist": {"type": "opencv", "index_or_path": 5, "width": 640, "height": 480, "fps": 30}, "corner": {"type": "opencv", "index_or_path": 2, "width": 640, "height": 480, "fps": 30}, "top": {"type": "opencv", "index_or_path": 10, "width": 640, "height": 480, "fps": 30}, "side": {"type": "opencv", "index_or_path": 6, "width": 640, "height": 480, "fps": 30}}',
             f"--dataset.single_task={config['task_name']}",
             "--dataset.repo_id=${HF_USER}/eval_act_base",
             "--dataset.root=${PWD}/eval_lerobot_datasetp/",
@@ -1095,9 +1095,9 @@ def execute_lerobot_move(move_type, move_string):
         # **PAUSE CAMERAS BEFORE EXECUTION**
         print("📷 Pausing GUI cameras to avoid conflicts...")
         pause_cameras = True
-        time.sleep(2)  # Give cameras time to release
+        time.sleep(3)  # Give more time for cameras to fully release
         
-        # Execute the command - expand environment variables
+        # Expand environment variables
         import os
         expanded_cmd = []
         for arg in cmd:
@@ -1110,7 +1110,23 @@ def execute_lerobot_move(move_type, move_string):
                 arg = arg.replace("${PWD}", pwd)
             expanded_cmd.append(arg)
         
-        result = subprocess.run(expanded_cmd, capture_output=False, text=True, timeout=180)  # 3 minute timeout
+        # Execute the command with better error handling
+        result = subprocess.run(
+            expanded_cmd, 
+            capture_output=True,  # Capture both stdout and stderr
+            text=True, 
+            timeout=300,  # 5 minute timeout
+            env=os.environ.copy()  # Inherit environment variables
+        )
+        
+        # Print output for debugging
+        if result.stdout:
+            print("📝 LeRobot stdout:")
+            print(result.stdout)
+        
+        if result.stderr:
+            print("📝 LeRobot stderr:")
+            print(result.stderr)
         
         # **RESUME CAMERAS AFTER EXECUTION**
         print("\n📷 Resuming GUI cameras...")
@@ -1123,17 +1139,35 @@ def execute_lerobot_move(move_type, move_string):
             return True
         else:
             print(f"❌ LeRobot execution failed (exit code: {result.returncode})")
+            
+            # Check for specific error messages and provide helpful feedback
+            if "ConnectionError" in result.stderr:
+                if "Lock" in result.stderr and "Incorrect status packet" in result.stderr:
+                    print("🔧 Robot communication error detected!")
+                    print("   Try these solutions:")
+                    print("   1. Check if robot arm is powered on")
+                    print("   2. Check USB connection (/dev/ttyACM1)")
+                    print("   3. Try unplugging and reconnecting the robot")
+                    print("   4. Make sure no other programs are using the robot")
+                elif "Failed to open" in result.stderr and "Camera" in result.stderr:
+                    print("📷 Camera access conflict detected!")
+                    print("   This should be resolved by camera pausing, but may need longer wait time")
+            
             return False
             
     except subprocess.TimeoutExpired:
-        print("⏰ LeRobot execution timed out (3 minutes)")
+        print("⏰ LeRobot execution timed out (5 minutes)")
         # Resume cameras even on timeout
+        print("📷 Resuming GUI cameras after timeout...")
         pause_cameras = False
+        time.sleep(2)
         return False
     except KeyboardInterrupt:
         print("\n🛑 LeRobot execution interrupted by user")
         # Resume cameras even on interrupt
+        print("📷 Resuming GUI cameras after interrupt...")
         pause_cameras = False
+        time.sleep(2)
         return False
     except FileNotFoundError:
         print("❌ LeRobot not found! Make sure lerobot is installed and in PATH")
@@ -1144,7 +1178,9 @@ def execute_lerobot_move(move_type, move_string):
     except Exception as e:
         print(f"❌ Unexpected error during LeRobot execution: {e}")
         # Resume cameras even on error
+        print("📷 Resuming GUI cameras after error...")
         pause_cameras = False
+        time.sleep(2)
         return False
 
 def get_move_type(move_string, board):
@@ -1247,23 +1283,15 @@ pause_cameras = False  # New flag to pause cameras during LeRobot execution
 
 def capture_frames(camera_idx, array_idx, frame_array):
     global stop_capture, pause_cameras
-    cap = cv2.VideoCapture(camera_idx)
+    cap = None
     
-    if not cap.isOpened():
-        print(f"Failed to open camera {camera_idx}")
-        return
-        
-    cap.set(cv2.CAP_PROP_FRAME_WIDTH, FRAME_WIDTH)
-    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, FRAME_HEIGHT)
-    cap.set(cv2.CAP_PROP_FPS, FPS)
-    
-    print(f"Successfully opened camera {camera_idx}")
-
     while not stop_capture:
         if pause_cameras:
             # Release camera during LeRobot execution
-            cap.release()
-            print(f"🔄 Camera {camera_idx} released for LeRobot")
+            if cap is not None:
+                cap.release()
+                cap = None
+                print(f"🔄 Camera {camera_idx} released for LeRobot")
             
             # Wait until pause is lifted
             while pause_cameras and not stop_capture:
@@ -1282,17 +1310,36 @@ def capture_frames(camera_idx, array_idx, frame_array):
                 print(f"✅ Camera {camera_idx} reconnected")
             else:
                 print(f"❌ Failed to reconnect camera {camera_idx}")
-                break
+                time.sleep(1)  # Wait before retry
+                continue
         else:
+            # Initialize camera if not already done
+            if cap is None:
+                cap = cv2.VideoCapture(camera_idx)
+                if not cap.isOpened():
+                    print(f"Failed to open camera {camera_idx}")
+                    time.sleep(1)
+                    continue
+                    
+                cap.set(cv2.CAP_PROP_FRAME_WIDTH, FRAME_WIDTH)
+                cap.set(cv2.CAP_PROP_FRAME_HEIGHT, FRAME_HEIGHT)
+                cap.set(cv2.CAP_PROP_FPS, FPS)
+                print(f"Successfully opened camera {camera_idx}")
+            
+            # Capture frames
             ret, frame = cap.read()
             if ret:
                 with frame_lock:
                     frame_array[array_idx] = frame
             else:
                 print(f"Error capturing frame from camera {camera_idx}")
+                # Try to reinitialize camera on read error
+                cap.release()
+                cap = None
                 time.sleep(0.1)  # Brief pause before retry
 
-    cap.release()
+    if cap is not None:
+        cap.release()
     print(f"Released camera {camera_idx}")
 
 # =========================
@@ -1896,6 +1943,15 @@ def main():
             if last_suggestion:
                 print(f"\n🤖 EXECUTING SUGGESTION WITH LEROBOT: {last_suggestion}")
                 
+                # Pre-execution checks
+                print("🔍 Pre-execution checks...")
+                
+                # Check if robot device exists
+                if not os.path.exists("/dev/ttyACM1"):
+                    print("❌ Robot device /dev/ttyACM1 not found!")
+                    print("   Check robot connection and run: ./robot_diagnostics.sh")
+                    continue
+                
                 # Determine move type
                 move_type = get_move_type(str(last_suggestion), current_board)
                 print(f"Move type detected: {move_type}")
@@ -1928,6 +1984,7 @@ def main():
                 else:
                     print("❌ LeRobot execution failed - suggestion still available")
                     print("   You can try again with 'L' or execute manually and press 'C'")
+                    print("   For robot issues, run: chmod +x robot_diagnostics.sh && ./robot_diagnostics.sh")
             else:
                 print("❌ No suggestion available to execute")
                 print("   Press 'S' to get a suggestion first")
