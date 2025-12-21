@@ -11,7 +11,7 @@ import time
 # CONFIG
 # =========================
 
-CAMERA_INDEXES = [8, 7, 3]  # wrist(8), top(7), side(3) - based on camera.txt
+CAMERA_INDEXES = [8, 7, 3]  # wrist(8), top(6), side(4) - based on camera.txt
 CALIB_FILE = "board_calib_4pt.json"
 BOARD_SIZE = 800  # The warped board will be BOARD_SIZE x BOARD_SIZE
 OCCUPANCY_THRESHOLD = 120  # Adjusted for better detection - lower = more sensitive
@@ -1070,12 +1070,18 @@ def capture_frames(camera_idx, array_idx, frame_array):
     cap.set(cv2.CAP_PROP_FPS, FPS)
     
     print(f"Successfully opened camera {camera_idx}")
+    frame_count = 0
 
     while not stop_capture:
         ret, frame = cap.read()
         if ret:
             with frame_lock:
-                frame_array[array_idx] = frame
+                frame_array[array_idx] = frame.copy()  # Make sure to copy the frame
+            frame_count += 1
+            
+            # Debug: Print status every 60 frames
+            if frame_count % 60 == 0:
+                print(f"Camera {camera_idx}: {frame_count} frames captured")
         else:
             print(f"Error capturing frame from camera {camera_idx}")
             time.sleep(0.1)  # Brief pause before retry
@@ -1099,18 +1105,19 @@ def main():
         if camera_idx not in available_cameras:
             print(f"WARNING: Camera {camera_idx} not found in available cameras!")
     
-    # Initialize the frames array
-    frames = [None] * len(CAMERA_INDEXES)
+    # Initialize the frames array (local variable)
+    local_frames = [None] * len(CAMERA_INDEXES)
     
     # Start the camera capture threads
     threads = []
     for i, camera_idx in enumerate(CAMERA_INDEXES):
-        thread = threading.Thread(target=capture_frames, args=(camera_idx, i, frames))
+        thread = threading.Thread(target=capture_frames, args=(camera_idx, i, local_frames))
         threads.append(thread)
         thread.start()
 
     # Wait for the threads to initialize
-    time.sleep(2)  # Sleep a bit to ensure threads are capturing frames
+    print("Waiting for cameras to start...")
+    time.sleep(3)  # Give cameras more time to initialize
 
     # Load calibration or calibrate
     if os.path.exists(CALIB_FILE):
@@ -1118,7 +1125,7 @@ def main():
     else:
         print("No calibration found, using live camera feed for calibration...")
         # Use the threaded frames for calibration to avoid camera conflicts
-        calib = calibrate_with_frame_source(frames, "frames")
+        calib = calibrate_with_frame_source(local_frames, "frames")
         if calib is None:
             print("Calibration failed!")
             stop_capture = True
@@ -1169,7 +1176,7 @@ def main():
     move_counter = 0
     # Track board state for move detection
     previous_occupancy = get_expected_starting_occupancy()
-    move_detection_active = True  # Start with detection active
+    move_detection_active = False  # Start with detection OFF for debugging
     stable_frame_count = 0
     required_stable_frames = 10  # Reduced for faster response
     
@@ -1193,27 +1200,40 @@ def main():
     print(f"Game started! Expected starting position:")
     print(f"Human (White) goes first - make your move!")
     print(f"Robot will play as Black")
+    print(f"Move detection is OFF - press 'D' to enable it later")
 
     while True:
         # Lock frames to avoid concurrent access issues
         with frame_lock:
             # Check if any frame is None
-            if any(frame is None for frame in frames):
+            if any(frame is None for frame in local_frames):
+                # Show loading message instead of skipping
+                loading_img = np.zeros((400, 600, 3), dtype=np.uint8)
+                cv2.putText(loading_img, "Loading camera feeds...", (50, 200), 
+                           cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
+                cv2.imshow("analysis", loading_img)
+                cv2.waitKey(1)
                 continue
 
-            top_view = frames[1].copy()
-            side_view = frames[2].copy()
-            wrist_view = frames[0].copy()
+            top_view = local_frames[1].copy()
+            side_view = local_frames[2].copy()
+            wrist_view = local_frames[0].copy()
 
         # Process the top view for chess detection
-        warped_top = warp_board(top_view, calib["points"])
-        rotated_board = rotate_board(warped_top)
-        
-        # Detect current board occupancy using color calibration if available
-        if color_calib:
-            occupancy_matrix = detect_board_state_color_based(rotated_board, color_calib)
-        else:
-            occupancy_matrix = detect_board_state(rotated_board)
+        try:
+            warped_top = warp_board(top_view, calib["points"])
+            rotated_board = rotate_board(warped_top)
+            
+            # Detect current board occupancy using color calibration if available
+            if color_calib:
+                occupancy_matrix = detect_board_state_color_based(rotated_board, color_calib)
+            else:
+                occupancy_matrix = detect_board_state(rotated_board)
+        except Exception as e:
+            print(f"Error processing board: {e}")
+            # Create a simple test board if processing fails
+            rotated_board = np.zeros((BOARD_SIZE, BOARD_SIZE, 3), dtype=np.uint8)
+            occupancy_matrix = np.zeros((8, 8), dtype=bool)
 
         # Move detection logic - only detect when board is stable
         detected_move = None
@@ -1432,13 +1452,21 @@ def main():
         # Display the warped, rotated board
         cv2.imshow("board", rotated_board)
 
-        # Show all camera views stacked horizontally
-        top_view_resized = cv2.resize(top_view, (300, 300))
-        side_view_resized = cv2.resize(side_view, (300, 300))
-        wrist_view_resized = cv2.resize(wrist_view, (300, 300))
+        # Show all camera views stacked horizontally  
+        try:
+            top_view_resized = cv2.resize(top_view, (300, 300))
+            side_view_resized = cv2.resize(side_view, (300, 300))  
+            wrist_view_resized = cv2.resize(wrist_view, (300, 300))
 
-        combined_view = np.hstack((top_view_resized, side_view_resized, wrist_view_resized))
-        cv2.imshow("camera views", combined_view)
+            combined_view = np.hstack((top_view_resized, side_view_resized, wrist_view_resized))
+            cv2.imshow("camera views", combined_view)
+        except Exception as e:
+            print(f"Error displaying camera views: {e}")
+            # Create placeholder if camera views fail
+            placeholder = np.zeros((300, 900, 3), dtype=np.uint8)
+            cv2.putText(placeholder, "Camera Error", (350, 150), 
+                       cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
+            cv2.imshow("camera views", placeholder)
         
         # Create analysis display
         analysis_img = np.zeros((600, 400, 3), dtype=np.uint8)
@@ -1514,7 +1542,7 @@ def main():
         elif key == ord('r'):
             print("\nRecalibrating board position...\n")
             # Use the live threaded frames for recalibration
-            calib = calibrate_with_frame_source(frames, "frames")
+            calib = calibrate_with_frame_source(local_frames, "frames")
             if calib is None:
                 print("Recalibration failed, continuing with old calibration")
         elif key == ord('t'):
@@ -1586,8 +1614,8 @@ def main():
             
             # Use current rotated board for color calibration
             with frame_lock:
-                if frames[1] is not None:
-                    calibration_frame = frames[1].copy()
+                if local_frames[1] is not None:
+                    calibration_frame = local_frames[1].copy()
                     warped_calib = warp_board(calibration_frame, calib["points"])
                     rotated_calib = rotate_board(warped_calib)
                     
@@ -1603,8 +1631,8 @@ def main():
             # Test piece detection on current board
             print("\n=== TESTING PIECE DETECTION ===")
             with frame_lock:
-                if frames[1] is not None:
-                    test_frame = frames[1].copy()
+                if local_frames[1] is not None:
+                    test_frame = local_frames[1].copy()
                     warped_test = warp_board(test_frame, calib["points"])
                     rotated_test = rotate_board(warped_test)
                     
@@ -1615,8 +1643,8 @@ def main():
             # Debug red piece detection
             print("\n=== RED PIECE DEBUG MODE ===")
             with frame_lock:
-                if frames[1] is not None:
-                    debug_frame = frames[1].copy()
+                if local_frames[1] is not None:
+                    debug_frame = local_frames[1].copy()
                     warped_debug = warp_board(debug_frame, calib["points"])
                     rotated_debug = rotate_board(warped_debug)
                     
