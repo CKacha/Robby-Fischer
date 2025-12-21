@@ -1,4 +1,4 @@
-;7<h1 align="center">
+<h1 align="center">
   <br>
   <a href="https://blueprint.hackclub.com/prototype">
     <img src="https://hc-cdn.hel1.your-objectstorage.com/s/v3/d1252b6d5ee8f6e7_group_3.png" width="200">
