@@ -1647,20 +1647,22 @@ def main():
                     last_analysis = None
                     
                     # Switch turns based on whose turn it is now
-                    if current_board.turn == chess.WHITE:  # Now white's turn (human)
-                        waiting_for_human_move = True
-                        waiting_for_robot_move = False
-                        print("Human's turn")
-                    else:  # Now black's turn (robot)
+                    if current_board.turn == chess.WHITE:  # Now white's turn (robot in demo mode)
                         waiting_for_human_move = False
                         waiting_for_robot_move = True
+                        print("Robot's turn")
+                        
                         # Get robot suggestion immediately
-                        robot_move = get_stockfish_move(current_board)
+                        robot_move = get_demo_move(current_board, demo_mode)
                         if robot_move:
                             last_suggestion = robot_move
                             last_analysis = analyze_position(current_board)
                             print(f"Robot move: {robot_move}")
                             print("Execute this move on the board!")
+                    else:  # Now black's turn (human in demo mode)
+                        waiting_for_human_move = True
+                        waiting_for_robot_move = False
+                        print("Human's turn")
                 else:
                     print("Illegal move!")
             except:
@@ -1672,11 +1674,28 @@ def main():
             last_suggestion = None
             last_analysis = None
             previous_occupancy = get_expected_starting_occupancy()
-            waiting_for_human_move = True
-            waiting_for_robot_move = False
-            move_detection_active = True
-            stable_frame_count = 0
-            print("Human (White) goes first - make your move!")
+            
+            # In demo mode, robot (white) goes first
+            if demo_mode:
+                waiting_for_human_move = False
+                waiting_for_robot_move = True
+                move_detection_active = True
+                stable_frame_count = 0
+                print("🎭 DEMO: Robot (White) goes first - getting first move...")
+                
+                # Get first demo move immediately
+                robot_move = get_demo_move(current_board, demo_mode)
+                if robot_move:
+                    last_suggestion = robot_move
+                    last_analysis = analyze_position(current_board)
+                    print(f"🤖 Robot suggestion: {robot_move}")
+                    print("Execute this move on the board!")
+            else:
+                waiting_for_human_move = True
+                waiting_for_robot_move = False
+                move_detection_active = True
+                stable_frame_count = 0
+                print("Human (White) goes first - make your move!")
         elif key == ord('d'):
             # Toggle move detection
             move_detection_active = not move_detection_active
