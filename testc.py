@@ -876,8 +876,19 @@ def detect_move_from_occupancy_change(prev_occupancy, curr_occupancy):
                 is_occupied = curr_occupancy[r, c]
                 changed_squares.append((square_name, was_occupied, is_occupied))
     
-    # Normal move: one square emptied, one filled (2 changes)
-    if len(changed_squares) == 2:
+    # Count total pieces before and after
+    total_before = np.sum(prev_occupancy)
+    total_after = np.sum(curr_occupancy)
+    piece_difference = total_before - total_after
+    
+    # Don't print debug info for minor changes (reduces spam)
+    if len(changed_squares) <= 3 and abs(piece_difference) <= 2:
+        pass  # Only print for significant changes
+    else:
+        print(f"Debug: {len(changed_squares)} squares changed, pieces: {total_before} -> {total_after} (diff: {piece_difference})")
+    
+    # Normal move: one square emptied, one filled (2 changes, same piece count)
+    if len(changed_squares) == 2 and piece_difference == 0:
         from_square = None
         to_square = None
         
@@ -888,75 +899,68 @@ def detect_move_from_occupancy_change(prev_occupancy, curr_occupancy):
                 to_square = square
         
         if from_square and to_square:
-            return f"{from_square}{to_square}"
+            move = f"{from_square}{to_square}"
+            print(f"Normal move detected: {move}")
+            return move
     
-    # Capture: only one square changes (piece moved to occupied square, replacing the piece)
-    elif len(changed_squares) == 1:
-        # This happens when a piece moves to a square that was already occupied
-        # We need to find which square became empty by comparing with expected moves
-        square_name, was_occupied, is_occupied = changed_squares[0]
-        
-        if was_occupied and is_occupied:
-            # Square was occupied and is still occupied - this could be a capture
-            # We need to find the source square by looking for missing pieces
-            # For now, return None and let the broader logic handle this
-            print(f"Possible capture detected at {square_name}")
-            return None
-        elif not was_occupied and is_occupied:
-            # Square became occupied - could be a capture destination
-            # Look for a square that became empty
-            for r in range(8):
-                for c in range(8):
-                    file_char = chr(ord('a') + c)
-                    rank_char = str(8 - r)
-                    potential_from = f"{file_char}{rank_char}"
-                    
-                    # Check if this square was occupied before but empty now
-                    if prev_occupancy[r, c] and not curr_occupancy[r, c]:
-                        # Found the source square
-                        return f"{potential_from}{square_name}"
-    
-    # Handle castling (king + rook move) - 4 changes
-    elif len(changed_squares) == 4:
-        # This could be castling - more complex logic needed
-        print("Possible castling detected")
-        pass
-    
-    # If we can't detect a clear pattern, try alternative detection
-    # Count total pieces before and after
-    total_before = np.sum(prev_occupancy)
-    total_after = np.sum(curr_occupancy)
-    
-    if total_before > total_after:
-        # A piece was captured - total pieces decreased
-        print(f"Capture detected: {total_before} -> {total_after} pieces")
-        
-        # Find the square that became empty (source)
+    # Capture: piece count decreased (but allow for detection errors)
+    elif piece_difference >= 1 and len(changed_squares) >= 1:
+        # Look for squares that became empty (source)
         from_square = None
         to_square = None
         
-        for r in range(8):
-            for c in range(8):
-                file_char = chr(ord('a') + c)
-                rank_char = str(8 - r)
-                square_name = f"{file_char}{rank_char}"
-                
-                was_occupied = prev_occupancy[r, c]
-                is_occupied = curr_occupancy[r, c]
-                
-                if was_occupied and not is_occupied:
-                    from_square = square_name
-                elif not was_occupied and is_occupied:
-                    to_square = square_name
+        # Find the most likely source square (became empty)
+        for square, was_occupied, is_occupied in changed_squares:
+            if was_occupied and not is_occupied:
+                from_square = square
+                break
         
-        # For captures, we might only see the source square become empty
-        # The destination might not register as "newly occupied" if detection is imperfect
-        if from_square:
-            # Try to find the most likely destination square among changed squares
-            if len(changed_squares) > 0:
-                # Use the first changed square as destination
-                dest_square, _, _ = changed_squares[0]
-                return f"{from_square}{dest_square}"
+        # For captures, find destination square
+        # It might be in changed squares, or might be a square that stayed occupied
+        for square, was_occupied, is_occupied in changed_squares:
+            if not was_occupied and is_occupied:
+                to_square = square
+                break
+        
+        # If no clear destination in changed squares, look for occupied squares
+        # that could be the destination based on chess logic
+        if from_square and not to_square:
+            # This is a capture where the destination square detection might be wonky
+            # We could try to infer the destination, but for now, let's be conservative
+            print(f"Possible capture from {from_square}, but destination unclear")
+            return None
+        
+        if from_square and to_square:
+            move = f"{from_square}{to_square}"
+            print(f"Capture detected: {move}")
+            return move
+    
+    # Single change that could be part of a move
+    elif len(changed_squares) == 1 and abs(piece_difference) <= 1:
+        square_name, was_occupied, is_occupied = changed_squares[0]
+        
+        if not was_occupied and is_occupied:
+            # A square became occupied - look for the most likely empty source
+            # Check nearby squares first for efficiency
+            file_idx = ord(square_name[0]) - ord('a')
+            rank_idx = int(square_name[1]) - 1
+            
+            # Check common move patterns (adjacent squares, diagonals, etc.)
+            for r in range(max(0, rank_idx-2), min(8, rank_idx+3)):
+                for c in range(max(0, file_idx-2), min(8, file_idx+3)):
+                    if prev_occupancy[7-r, c] and not curr_occupancy[7-r, c]:  # Was occupied, now empty
+                        file_char = chr(ord('a') + c)
+                        rank_char = str(r + 1)
+                        potential_from = f"{file_char}{rank_char}"
+                        move = f"{potential_from}{square_name}"
+                        print(f"Single change move: {move}")
+                        return move
+    
+    # If too many changes or unclear pattern, likely hand movement or detection error
+    if len(changed_squares) > 4 or abs(piece_difference) > 3:
+        if len(changed_squares) <= 6:  # Don't spam for very large changes
+            print(f"Too many changes ({len(changed_squares)} squares, {piece_difference} pieces) - likely hand movement")
+        return None
     
     return None
 
@@ -1167,13 +1171,17 @@ def main():
     previous_occupancy = get_expected_starting_occupancy()
     move_detection_active = True  # Start with detection active
     stable_frame_count = 0
-    required_stable_frames = 15  # Reduced for faster response
+    required_stable_frames = 10  # Reduced for faster response
     
     # Game state tracking
     waiting_for_human_move = True  # Human goes first
     waiting_for_robot_move = False
     last_detected_occupancy = None
     move_just_detected = False
+    
+    # Anti-spam and stability tracking
+    last_large_change_time = 0
+    hand_movement_cooldown = 3.0  # Seconds to ignore after large changes
     
     # Load color calibration if available
     color_calib = load_piece_color_calibration()
@@ -1207,31 +1215,76 @@ def main():
         else:
             occupancy_matrix = detect_board_state(rotated_board)
 
-        # Move detection logic
+        # Move detection logic - only detect when board is stable
         detected_move = None
         if move_detection_active and not current_board.is_game_over():
             # Check if current occupancy is different from previous
             if not np.array_equal(occupancy_matrix, previous_occupancy):
-                # Check if occupancy is consistent with a single move
-                detected_move = detect_move_from_occupancy_change(previous_occupancy, occupancy_matrix)
+                # Count total pieces to filter out hand movements
+                total_pieces_before = np.sum(previous_occupancy)
+                total_pieces_after = np.sum(occupancy_matrix)
+                piece_difference = total_pieces_before - total_pieces_after  # Signed difference
                 
-                # Also check if any expected move matches the current situation
-                if not detected_move and last_suggestion:
-                    # Check if the suggested move could be what happened
-                    expected_from = str(last_suggestion)[:2]
-                    expected_to = str(last_suggestion)[2:4]
+                # Check if we're in a hand movement cooldown period
+                current_time = time.time()
+                if current_time - last_large_change_time < hand_movement_cooldown:
+                    if stable_frame_count == 0:  # Only print once
+                        print(f"⏳ Ignoring changes during cooldown period ({hand_movement_cooldown - (current_time - last_large_change_time):.1f}s remaining)")
+                    stable_frame_count = 0
+                    continue
+                
+                # Detect hand movements - if too many pieces change suddenly
+                if abs(piece_difference) > 8 or np.sum(occupancy_matrix != previous_occupancy) > 10:
+                    print(f"🖐️ Hand movement detected: {total_pieces_before} -> {total_pieces_after} pieces, ignoring for {hand_movement_cooldown}s")
+                    last_large_change_time = current_time
+                    stable_frame_count = 0
+                    continue
+                
+                # More permissive filtering for piece count changes
+                # Allow larger differences but require stability over multiple frames
+                max_allowed_difference = 5  # Increased from 3 to handle detection errors better
+                
+                if abs(piece_difference) <= max_allowed_difference:
+                    # Check if occupancy is consistent with a single move
+                    detected_move = detect_move_from_occupancy_change(previous_occupancy, occupancy_matrix)
                     
-                    # Convert to matrix coordinates
-                    from_c = ord(expected_from[0]) - ord('a')
-                    from_r = 8 - int(expected_from[1])
-                    to_c = ord(expected_to[0]) - ord('a')
-                    to_r = 8 - int(expected_to[1])
+                    # Also check if any expected move matches the current situation
+                    if not detected_move and last_suggestion:
+                        # Check if the suggested move could be what happened
+                        expected_from = str(last_suggestion)[:2]
+                        expected_to = str(last_suggestion)[2:4]
+                        
+                        # Convert to matrix coordinates
+                        from_c = ord(expected_from[0]) - ord('a')
+                        from_r = 8 - int(expected_from[1])
+                        to_c = ord(expected_to[0]) - ord('a')
+                        to_r = 8 - int(expected_to[1])
+                        
+                        # Check if the from square is now empty and to square is occupied
+                        if (previous_occupancy[from_r, from_c] and not occupancy_matrix[from_r, from_c] and
+                            occupancy_matrix[to_r, to_c]):
+                            detected_move = str(last_suggestion)
+                            print(f"📍 Matched expected move: {detected_move}")
                     
-                    # Check if the from square is now empty and to square is occupied
-                    if (previous_occupancy[from_r, from_c] and not occupancy_matrix[from_r, from_c] and
-                        occupancy_matrix[to_r, to_c]):
-                        detected_move = str(last_suggestion)
-                        print(f"📍 Matched expected move: {detected_move}")
+                    # Don't wait indefinitely for captures - be more flexible
+                    if not detected_move and piece_difference > 0:
+                        # Only wait a bit for captures, don't get stuck
+                        if stable_frame_count < 5:  # Reduced from longer wait
+                            print(f"🔍 Possible capture in progress (lost {piece_difference} pieces), waiting... ({stable_frame_count}/5)")
+                            stable_frame_count += 1
+                            continue
+                        else:
+                            print(f"⚠️  Capture detection timeout, ignoring changes")
+                            stable_frame_count = 0
+                            continue
+                        
+                else:
+                    # Too many pieces changed - likely hand movement
+                    # But don't print this constantly, only occasionally
+                    if stable_frame_count == 0:  # Only print once per disturbance
+                        print(f"⚠️  Large board change detected: {total_pieces_before} -> {total_pieces_after} pieces (likely hand movement)")
+                    stable_frame_count = 0
+                    continue  # Don't process this as a potential move
                 
                 if detected_move:
                     stable_frame_count += 1
@@ -1257,8 +1310,8 @@ def main():
                                     last_suggestion = None
                                     last_analysis = None
                                     
-                                    # Update tracking state
-                                    previous_occupancy = occupancy_matrix.copy()
+                                    # Update tracking state using actual board position
+                                    previous_occupancy = get_board_occupancy_from_chess_board(current_board)
                                     stable_frame_count = 0
                                     
                                     # Switch to waiting for human move
@@ -1279,15 +1332,17 @@ def main():
                                     current_board.push(move)
                                     move_counter += 1
                                     
-                                    # Update tracking state
-                                    previous_occupancy = occupancy_matrix.copy()
+                                    # Update tracking state using actual board position
+                                    previous_occupancy = get_board_occupancy_from_chess_board(current_board)
                                     stable_frame_count = 0
                                     
                                     # Switch to robot turn - get suggestion immediately
                                     waiting_for_human_move = False
                                     waiting_for_robot_move = True
                                     
+                                    # Always get robot suggestion after human move (unless game over)
                                     if not current_board.is_game_over():
+                                        print("🤖 Getting robot move...")
                                         robot_move = get_stockfish_move(current_board)
                                         if robot_move:
                                             last_suggestion = robot_move
@@ -1295,7 +1350,9 @@ def main():
                                             print(f"🤖 Robot suggestion: {robot_move}")
                                             print("Execute this move on the board!")
                                         else:
-                                            print("No robot move available")
+                                            print("❌ No robot move available")
+                                            waiting_for_robot_move = False
+                                            waiting_for_human_move = True
                                     else:
                                         print("🎉 Game Over!")
                                         waiting_for_robot_move = False
@@ -1304,16 +1361,18 @@ def main():
                                     print(f"⚠️  Unexpected move detected: {detected_move}")
                                     if last_suggestion:
                                         print(f"    Expected: {last_suggestion}")
+                                    print("    Ignoring unexpected move...")
                                     stable_frame_count = 0
                             else:
-                                print(f"❌ Detected illegal move: {detected_move}")
+                                print(f"❌ Detected illegal move: {detected_move} - ignoring")
                                 stable_frame_count = 0
                         except Exception as e:
-                            print(f"❌ Invalid move format: {detected_move} - {e}")
+                            print(f"❌ Invalid move format: {detected_move} - {e} - ignoring")
                             stable_frame_count = 0
                 else:
                     stable_frame_count = 0
             else:
+                # Board is stable (no changes), reset counter
                 stable_frame_count = 0
 
         sq = BOARD_SIZE // 8
