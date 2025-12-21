@@ -1,0 +1,11 @@
+# Ignore all mp4 files
+*.mp4
+*.mp3
+
+# Test artifacts (generated files)
+tests/artifacts/
+
+# Large binary model/data files
+*.safetensors
+*.bag
+*.png

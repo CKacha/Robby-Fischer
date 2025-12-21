@@ -1,0 +1,148 @@
+castle
+lerobot-record \
+    --robot.type=so101_follower \
+    --robot.port=/dev/ttyACM1 \
+    --robot.id=my_awesome_follower_arm \
+    --robot.cameras="{wrist: {type: opencv, index_or_path: 5, width: 640, height: 480, fps: 30}, corner: {type: opencv, index_or_path: 2, width: 640, height: 480, fps: 30}, top: {type: opencv, index_or_path: 10, width: 640, height: 480, fps: 30}, side: {type: opencv, index_or_path: 6, width: 640, height: 480, fps: 30}}" \
+    --teleop.type=so101_leader \
+    --teleop.port=/dev/ttyACM0 \
+    --teleop.id=my_awesome_leader_arm \
+    --display_data=true \
+    --dataset.repo_id=Bor3dguy/leftcastle \
+    --dataset.num_episodes=25 \
+    --dataset.episode_time_s=25 \
+    --dataset.reset_time_s=5 \
+    --dataset.single_task="Castle" \
+    --dataset.root=${HOME}/so101_datasetv6 \
+
+
+
+
+bishop
+lerobot-record \
+    --robot.type=so101_follower \
+    --robot.port=/dev/ttyACM1 \
+    --robot.id=my_awesome_follower_arm \
+    --robot.cameras="{wrist: {type: opencv, index_or_path: 5, width: 640, height: 480, fps: 30}, corner: {type: opencv, index_or_path: 2, width: 640, height: 480, fps: 30}, top: {type: opencv, index_or_path: 10, width: 640, height: 480, fps: 30}, side: {type: opencv, index_or_path: 6, width: 640, height: 480, fps: 30}}" \
+    --teleop.type=so101_leader \
+    --teleop.port=/dev/ttyACM0 \
+    --teleop.id=my_awesome_leader_arm \
+    --display_data=true \
+    --dataset.repo_id=Bor3dguy/Bb4 \
+    --dataset.num_episodes=20 \
+    --dataset.episode_time_s=20 \
+    --dataset.reset_time_s=5 \
+    --dataset.single_task="Bishop" \
+    --dataset.root=${HOME}/so101_datasetv3 \
+    --resume=True
+
+lerobot-record \
+  --robot.type=so101_follower \
+  --robot.port=/dev/ttyACM1 \
+  --robot.id=my_awesome_follower_arm \
+  --robot.cameras="{wrist: {type: opencv, index_or_path: 5, width: 640, height: 480, fps: 30}, corner: {type: opencv, index_or_path: 2, width: 640, height: 480, fps: 30}, top: {type: opencv, index_or_path: 10, width: 640, height: 480, fps: 30}, side: {type: opencv, index_or_path: 6, width: 640, height: 480, fps: 30}}" \
+  --dataset.single_task="Bishop" \
+  --dataset.repo_id=${HF_USER}/eval_act_base \
+  --dataset.root=${PWD}/eval_lerobot_dataset/ \
+  --dataset.episode_time_s=60 \
+  --dataset.num_episodes=1 \
+  --policy.path=Bor3dguy/act_so101_Bb4v1
+
+
+knight
+lerobot-record \
+  --robot.type=so101_follower \
+  --robot.port=/dev/ttyACM1 \
+  --robot.id=my_awesome_follower_arm \
+  --robot.cameras="{wrist: {type: opencv, index_or_path: 5, width: 640, height: 480, fps: 30}, corner: {type: opencv, index_or_path: 2, width: 640, height: 480, fps: 30}, top: {type: opencv, index_or_path: 10, width: 640, height: 480, fps: 30}, side: {type: opencv, index_or_path: 6, width: 640, height: 480, fps: 30}}" \
+  --dataset.single_task="X" \
+  --dataset.repo_id=${HF_USER}/eval_act_base \
+  --dataset.root=${PWD}/eval_lerobot_dataset/ \
+  --dataset.episode_time_s=60 \
+  --dataset.num_episodes=1 \
+  --policy.path=Bor3dguy/knight
+
+
+lerobot-record \
+    --robot.type=so101_follower \
+    --robot.port=/dev/ttyACM1 \
+    --robot.id=my_awesome_follower_arm \
+    --robot.cameras="{wrist: {type: opencv, index_or_path: 5, width: 640, height: 480, fps: 30}, corner: {type: opencv, index_or_path: 2, width: 640, height: 480, fps: 30}, top: {type: opencv, index_or_path: 10, width: 640, height: 480, fps: 30}, side: {type: opencv, index_or_path: 6, width: 640, height: 480, fps: 30}}" \
+    --teleop.type=so101_leader \
+    --teleop.port=/dev/ttyACM0 \
+    --teleop.id=my_awesome_leader_arm \
+    --display_data=true \
+    --dataset.repo_id=Bor3dguy/knight \
+    --dataset.num_episodes=25 \ 
+    --dataset.episode_time_s=20 \
+    --dataset.reset_time_s=10 \
+    --dataset.single_task="Move knight" \
+    --dataset.root=${HOME}/so101_datasetv3 \
+    --resume=True
+
+
+Traceback (most recent call last):
+  File "/home/bor3d/Documents/GitHub/ChessArm/testc.py", line 1813, in <module>
+    main()
+    ~~~~^^
+  File "/home/bor3d/Documents/GitHub/ChessArm/testc.py", line 1148, in main
+    cv2.namedWindow("board", cv2.WINDOW_NORMAL)
+    ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+cv2.error: OpenCV(4.12.0) /io/opencv/modules/highgui/src/window.cpp:1284: error: (-2:Unspecified error) The function is not implemented. Rebuild the library with Windows, GTK+ 2.x or Cocoa support. If you are on Ubuntu or Debian, install libgtk2.0-dev and pkg-config, then re-run cmake or configure script in function 'cvNamedWindow'
+
+CALLS:
+ PAWN
+
+lerobot-record \
+  --robot.type=so101_follower \
+  --robot.port=/dev/ttyACM1 \
+  --robot.id=my_awesome_follower_arm \
+  --robot.cameras="{wrist: {type: opencv, index_or_path: 5, width: 640, height: 480, fps: 30}, corner: {type: opencv, index_or_path: 2, width: 640, height: 480, fps: 30}, top: {type: opencv, index_or_path: 10, width: 640, height: 480, fps: 30}, side: {type: opencv, index_or_path: 6, width: 640, height: 480, fps: 30}}" \
+  --dataset.single_task="pick up pawn and move it" \
+  --dataset.repo_id=${HF_USER}/eval_act_base \
+  --dataset.root=${PWD}/eval_lerobot_datasetp/ \
+  --dataset.episode_time_s=120 \
+  --dataset.num_episodes=1 \
+  --policy.path=Bor3dguy/act_so101_e7e5pawnv3
+
+KNIGHT
+
+lerobot-record \
+  --robot.type=so101_follower \
+  --robot.port=/dev/ttyACM1 \
+  --robot.id=my_awesome_follower_arm \
+  --robot.cameras="{wrist: {type: opencv, index_or_path: 5, width: 640, height: 480, fps: 30}, corner: {type: opencv, index_or_path: 2, width: 640, height: 480, fps: 30}, top: {type: opencv, index_or_path: 10, width: 640, height: 480, fps: 30}, side: {type: opencv, index_or_path: 6, width: 640, height: 480, fps: 30}}" \
+  --dataset.single_task="moving the knight" \
+  --dataset.repo_id=${HF_USER}/eval_act_base \
+  --dataset.root=${PWD}/eval_lerobot_datasetk/ \
+  --dataset.episode_time_s=60 \
+  --dataset.num_episodes=1 \
+  --policy.path=Bor3dguy/act_so101_knight
+
+BISHOP 
+
+lerobot-record \
+  --robot.type=so101_follower \
+  --robot.port=/dev/ttyACM1 \
+  --robot.id=my_awesome_follower_arm \
+  --robot.cameras="{wrist: {type: opencv, index_or_path: 5, width: 640, height: 480, fps: 30}, corner: {type: opencv, index_or_path: 2, width: 640, height: 480, fps: 30}, top: {type: opencv, index_or_path: 10, width: 640, height: 480, fps: 30}, side: {type: opencv, index_or_path: 6, width: 640, height: 480, fps: 30}}" \
+  --dataset.single_task="Bishop" \
+  --dataset.repo_id=${HF_USER}/eval_act_base \
+  --dataset.root=${PWD}/eval_lerobot_datasetb/ \
+  --dataset.episode_time_s=60 \
+  --dataset.num_episodes=1 \
+  --policy.path=Bor3dguy/act_so101_Bb4v1
+
+CASTLE 
+  
+  lerobot-record \
+  --robot.type=so101_follower \
+  --robot.port=/dev/ttyACM1 \
+  --robot.id=my_awesome_follower_arm \
+  --robot.cameras="{wrist: {type: opencv, index_or_path: 5, width: 640, height: 480, fps: 30}, corner: {type: opencv, index_or_path: 2, width: 640, height: 480, fps: 30}, top: {type: opencv, index_or_path: 10, width: 640, height: 480, fps: 30}, side: {type: opencv, index_or_path: 6, width: 640, height: 480, fps: 30}}" \
+  --dataset.single_task="Castle" \
+  --dataset.repo_id=${HF_USER}/eval_act_base \
+  --dataset.root=${PWD}/eval_lerobot_datasetc/ \
+  --dataset.episode_time_s=60 \
+  --dataset.num_episodes=1 \
+  --policy.path=Bor3dguy/act_so101_leftcastle

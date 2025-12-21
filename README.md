@@ -36,8 +36,10 @@
 
 ### Our Team!
 
-**Team Name:** The Fischers  
+**Team Name:** TPC 
+
 **Team Number:** 18
+
 **GitHub Usernames:**  
 - @TaniWanKenobi
 - @techn1-cal  
