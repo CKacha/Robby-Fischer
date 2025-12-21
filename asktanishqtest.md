@@ -132,9 +132,9 @@ Camera Input → Board Detection → Stockfish AI → Arm Execution → Repeat-
 
 This project makes use of the following tools and resources:
 
-- **Onshape** — CAD design for chess pieces and board
-- **Stockfish** — Open-source chess engine
-- **Hugging Face LeRobot** — Robotic arm platform
-- **AMD** and **Hack Club** — Hardware and program support
+- **Onshape**: CAD design for chess pieces and board
+- **Stockfish**: Open-source chess engine
+- **Hugging Face LeRobot**: Robotic arm platform
+- **AMD** and **Hack Club** : Hardware and program support and resources
 
 Additional credits to be added as development continues.
