@@ -1038,7 +1038,7 @@ def execute_lerobot_move(move_type, move_string):
             "--dataset.single_task=pick up pawn and move it",
             "--dataset.repo_id=${HF_USER}/eval_act_base",
             "--dataset.root=${PWD}/eval_lerobot_datasetp/",
-            "--dataset.episode_time_s=120",
+            "--dataset.episode_time_s=30",
             "--dataset.num_episodes=1",
             "--policy.path=Bor3dguy/act_so101_e7e5pawnv3"
         ]
@@ -1214,7 +1214,7 @@ def get_move_type(move_string, board):
 
 # Preset sequence for demo
 DEMO_MOVES = [
-    "e2e4",  # White move 1: E2-E4
+    "e2e3",  # White move 1: E2-E3 (changed from e2e4)
     "g1f3",  # White move 2: Knight G1-F3 (corrected from your list)
     "f1b4",  # White move 3: Bishop F1-B4 (corrected from your list) 
     "f2f4",  # White move 4: F2-F4 (corrected from your list)
@@ -1442,7 +1442,7 @@ def main():
     print("6. Robot will suggest the next preset move")
     print("")
     print("DEMO GAME SEQUENCE:")
-    print("White: e2e4 → g1f3 → f1b4 → f2f4 → e1g1 (castle)")
+    print("White: e2e3 → g1f3 → f1b4 → f2f4 → e1g1 (castle)")
     print("Black: Your moves (any legal moves)")
     print("")
     print("CALIBRATION:")
@@ -2122,7 +2122,7 @@ def main():
             print(f"🎭 Demo mode: {'ON' if demo_mode else 'OFF'}")
             if demo_mode:
                 print("Robot will use preset moves")
-                print("Current demo sequence: e2e4 → g1f3 → f1b4 → f2f4 → e1g1")
+                print("Current demo sequence: e2e3 → g1f3 → f1b4 → f2f4 → e1g1")
             else:
                 print("Robot will use Stockfish suggestions")
         elif key == ord('c'):
