@@ -876,13 +876,11 @@ def detect_move_from_occupancy_change(prev_occupancy, curr_occupancy):
                 is_occupied = curr_occupancy[r, c]
                 changed_squares.append((square_name, was_occupied, is_occupied))
     
-    # Count total pieces before and after
-    total_before = np.sum(prev_occupancy)
-    total_after = np.sum(curr_occupancy)
-    piece_difference = total_before - total_after
+    # ONLY detect moves based on square changes, NOT piece count
+    # This prevents false capture detection due to vision errors
     
-    # Normal move: one square emptied, one filled (2 changes, same piece count)
-    if len(changed_squares) == 2 and piece_difference == 0:
+    # Normal move: exactly 2 squares changed - one emptied, one filled
+    if len(changed_squares) == 2:
         from_square = None
         to_square = None
         
@@ -893,37 +891,53 @@ def detect_move_from_occupancy_change(prev_occupancy, curr_occupancy):
                 to_square = square
         
         if from_square and to_square:
-            return f"{from_square}{to_square}"
+            move = f"{from_square}{to_square}"
+            print(f"Move detected: {move}")
+            return move
     
-    # TRUE CAPTURE: piece count decreased by exactly 1
-    elif piece_difference == 1:
-        # Find the source square (became empty) and destination square
-        from_square = None
-        to_square = None
+    # Single square change - could be part of a capture where destination 
+    # square detection is imperfect (piece replaced another piece)
+    elif len(changed_squares) == 1:
+        square_name, was_occupied, is_occupied = changed_squares[0]
         
-        for square, was_occupied, is_occupied in changed_squares:
-            if was_occupied and not is_occupied:  # Square became empty
-                from_square = square
-            elif not was_occupied and is_occupied:  # Square became occupied  
-                to_square = square
+        # If a square became empty, try to find where the piece went
+        if was_occupied and not is_occupied:
+            # Look for the most likely destination square
+            # Check all squares that are currently occupied
+            for r in range(8):
+                for c in range(8):
+                    if curr_occupancy[r, c] and not prev_occupancy[r, c]:
+                        # This square is now occupied but wasn't before
+                        file_char = chr(ord('a') + c)
+                        rank_char = str(8 - r)
+                        potential_to = f"{file_char}{rank_char}"
+                        move = f"{square_name}{potential_to}"
+                        print(f"Possible capture detected: {move}")
+                        return move
         
-        # For captures, we might only see the source square change if destination
-        # square detection is imperfect (piece replaced another piece)
-        if from_square:
-            # If we have a clear destination, use it
-            if to_square:
-                return f"{from_square}{to_square}"
-            
-            # Otherwise, look for any square that could be the destination
-            # among the changed squares or nearby occupied squares
-            for square, was_occupied, is_occupied in changed_squares:
-                if is_occupied:  # Any square that's now occupied could be destination
-                    return f"{from_square}{square}"
+        # If a square became occupied, find where the piece came from
+        elif not was_occupied and is_occupied:
+            # Look for a square that became empty
+            for r in range(8):
+                for c in range(8):
+                    if not curr_occupancy[r, c] and prev_occupancy[r, c]:
+                        # This square was occupied but is now empty
+                        file_char = chr(ord('a') + c)
+                        rank_char = str(8 - r)
+                        potential_from = f"{file_char}{rank_char}"
+                        move = f"{potential_from}{square_name}"
+                        print(f"Move detected: {move}")
+                        return move
     
-    # Handle castling (king + rook move) - 4 changes, same piece count
-    elif len(changed_squares) == 4 and piece_difference == 0:
-        print("Possible castling detected")
-        pass
+    # Handle castling (king + rook move) - 4 changes, but ignore for now
+    elif len(changed_squares) == 4:
+        print("Possible castling detected - ignoring for now")
+        return None
+    
+    # Too many or too few changes - likely detection error or hand movement
+    elif len(changed_squares) > 4:
+        print(f"Too many changes ({len(changed_squares)}) - likely hand movement")
+        return None
     
     return None
 
@@ -989,6 +1003,48 @@ def occupancy_to_fen(occupancy_matrix, reference_board=None):
         fen_rows.append(fen_row)
     
     return "/".join(fen_rows) + " w - - 0 1"
+
+# =========================
+# DEMO MODE - PRESET MOVES
+# =========================
+
+# Preset sequence for demo
+DEMO_MOVES = [
+    "e2e4",  # White move 1: E2-E4
+    "g1f3",  # White move 2: Knight G1-F3 (corrected from your list)
+    "f1b4",  # White move 3: Bishop F1-B4 (corrected from your list) 
+    "f2f4",  # White move 4: F2-F4 (corrected from your list)
+    "e1g1"   # White move 5: Castle kingside (O-O)
+]
+
+def get_demo_move(current_board, demo_mode=True):
+    """
+    Get the next preset move for demo mode
+    Returns the predetermined move for the robot (white)
+    """
+    if not demo_mode:
+        return get_stockfish_move(current_board)
+    
+    # Count white moves made so far
+    move_count = len([move for move in current_board.move_stack if current_board.move_stack.index(move) % 2 == 0])
+    
+    if move_count < len(DEMO_MOVES):
+        suggested_move = DEMO_MOVES[move_count]
+        
+        try:
+            move = chess.Move.from_uci(suggested_move)
+            if move in current_board.legal_moves:
+                print(f"🎭 DEMO: Robot suggests {suggested_move}")
+                return move
+            else:
+                print(f"⚠️ Demo move {suggested_move} not legal, falling back to first legal move")
+                return list(current_board.legal_moves)[0] if current_board.legal_moves else None
+        except:
+            print(f"⚠️ Invalid demo move format: {suggested_move}")
+            return list(current_board.legal_moves)[0] if current_board.legal_moves else None
+    else:
+        print("🎭 DEMO: All preset moves completed, using first legal move")
+        return list(current_board.legal_moves)[0] if current_board.legal_moves else None
 
 # =========================
 # STOCKFISH INTERACTION
@@ -1109,14 +1165,19 @@ def main():
     print("  P = Calibrate piece colors")
     print("  B = Test piece detection on board")
     print("  X = Debug red piece detection")
+    print("  O = Toggle demo mode ON/OFF")
     print("  Q = Quit")
     print("")
-    print("WORKFLOW:")
-    print("1. First time setup: Press 'P' to calibrate piece/board colors")
-    print("2. Press 'S' to get Stockfish suggestion")
-    print("3. Make the move on the physical board")
-    print("4. Press 'D' to enable move detection OR 'C' to confirm manually")
-    print("5. Robot will analyze and make its move")
+    print("🎭 DEMO MODE WORKFLOW:")
+    print("1. Robot (White) will suggest preset moves automatically")
+    print("2. Execute the robot's suggested move on the physical board")
+    print("3. Press 'C' to confirm the move OR enable move detection with 'D'")
+    print("4. Make your human (Black) move")
+    print("5. Robot will suggest the next preset move")
+    print("")
+    print("DEMO GAME SEQUENCE:")
+    print("White: e2e4 → g1f3 → f1b4 → f2f4 → e1g1 (castle)")
+    print("Black: Your moves (any legal moves)")
     print("")
     print("CALIBRATION:")
     print("- If pieces aren't detected, press 'P' to calibrate colors")
@@ -1137,10 +1198,13 @@ def main():
     required_stable_frames = 15  # Reduced for faster response
     
     # Game state tracking
-    waiting_for_human_move = True  # Human goes first
-    waiting_for_robot_move = False
+    waiting_for_human_move = False  # Robot (white) goes first in demo mode
+    waiting_for_robot_move = True   # Start waiting for robot move
     last_detected_occupancy = None
     move_just_detected = False
+    
+    # Demo mode settings
+    demo_mode = True  # Enable demo mode by default
     
     # Load color calibration if available
     color_calib = load_piece_color_calibration()
@@ -1149,9 +1213,19 @@ def main():
     else:
         print("No color calibration found - you can create one with 'P'")
     
-    print(f"Game started! Expected starting position:")
-    print(f"Human (White) goes first - make your move!")
-    print(f"Robot will play as Black")
+    print(f"🎭 DEMO MODE ACTIVE!")
+    print(f"Preset game sequence loaded")
+    print(f"Robot (White) goes first - getting first move...")
+    print(f"Human plays Black pieces")
+    
+    # Get first demo move immediately
+    if demo_mode and not current_board.is_game_over():
+        robot_move = get_demo_move(current_board, demo_mode)
+        if robot_move:
+            last_suggestion = robot_move
+            last_analysis = analyze_position(current_board)
+            print(f"🤖 Robot suggestion: {robot_move}")
+            print("Execute this move on the board!")
 
     while True:
         # Lock frames to avoid concurrent access issues
@@ -1255,7 +1329,7 @@ def main():
                                     waiting_for_robot_move = True
                                     
                                     if not current_board.is_game_over():
-                                        robot_move = get_stockfish_move(current_board)
+                                        robot_move = get_demo_move(current_board, demo_mode)
                                         if robot_move:
                                             last_suggestion = robot_move
                                             last_analysis = analyze_position(current_board)
@@ -1542,7 +1616,7 @@ def main():
                     print("No suggestion available")
             elif waiting_for_robot_move and not last_suggestion:
                 print("\nGetting robot move...")
-                robot_move = get_stockfish_move(current_board)
+                robot_move = get_demo_move(current_board, demo_mode)
                 if robot_move:
                     last_suggestion = robot_move
                     last_analysis = analyze_position(current_board)
@@ -1652,7 +1726,7 @@ def main():
                         waiting_for_robot_move = True
                         # Get robot suggestion immediately
                         if not current_board.is_game_over():
-                            robot_move = get_stockfish_move(current_board)
+                            robot_move = get_demo_move(current_board, demo_mode)
                             if robot_move:
                                 last_suggestion = robot_move
                                 last_analysis = analyze_position(current_board)
@@ -1664,6 +1738,15 @@ def main():
                     print("Invalid suggested move!")
             else:
                 print("No move to confirm")
+        elif key == ord('o'):
+            # Toggle demo mode
+            demo_mode = not demo_mode
+            print(f"🎭 Demo mode: {'ON' if demo_mode else 'OFF'}")
+            if demo_mode:
+                print("Robot will use preset moves")
+                print("Current demo sequence: e2e4 → g1f3 → f1b4 → f2f4 → e1g1")
+            else:
+                print("Robot will use Stockfish suggestions")
         elif key == ord('c'):
             # Confirm that a suggested move has been executed
             if last_suggestion:
@@ -1688,7 +1771,7 @@ def main():
                     waiting_for_robot_move = True
                     # Get robot suggestion immediately
                     if not current_board.is_game_over():
-                        robot_move = get_stockfish_move(current_board)
+                        robot_move = get_demo_move(current_board, demo_mode)
                         if robot_move:
                             last_suggestion = robot_move
                             last_analysis = analyze_position(current_board)
