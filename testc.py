@@ -7,7 +7,7 @@ import chess.engine
 import threading
 import time
 
-CAMERA_INDEXES = [8, 6, 4] 
+CAMERA_INDEXES = [8, 6, 3] 
 CALIB_FILE = "board_calib_4pt.json"
 BOARD_SIZE = 800  
 OCCUPANCY_THRESHOLD = 120  
