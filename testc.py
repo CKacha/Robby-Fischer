@@ -1038,7 +1038,7 @@ def execute_lerobot_move(move_type, move_string):
             "--dataset.single_task=pick up pawn and move it",
             "--dataset.repo_id=${HF_USER}/eval_act_base",
             "--dataset.root=${PWD}/eval_lerobot_datasetp/",
-            "--dataset.episode_time_s=15",
+            "--dataset.episode_time_s=22",
             "--dataset.num_episodes=1",
             "--policy.path=Bor3dguy/act_so101_e7e5pawnv3"
         ]
