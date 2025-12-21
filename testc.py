@@ -7,14 +7,18 @@ import chess.engine
 import threading
 import time
 
-CAMERA_INDEXES = [8, 6, 3] 
+# =========================
+# CONFIG
+# =========================
+
+CAMERA_INDEXES = [8, 6, 4]  # wrist(8), top(6), side(4) - based on camera.txt
 CALIB_FILE = "board_calib_4pt.json"
-BOARD_SIZE = 800  
-OCCUPANCY_THRESHOLD = 120  
+BOARD_SIZE = 800  # The warped board will be BOARD_SIZE x BOARD_SIZE
+OCCUPANCY_THRESHOLD = 120  # Adjusted for better detection - lower = more sensitive
 CENTER_MARGIN = 0.25
-FRAME_WIDTH = 640  
+FRAME_WIDTH = 640  # Resolution for FPS
 FRAME_HEIGHT = 480
-FPS = 30  
+FPS = 30  # Set the frame rate to 30 FPS for each camera
 
 clicked_points = []
 frame_lock = threading.Lock()  
@@ -43,6 +47,10 @@ def detect_cameras():
     
     return available_cameras
 
+# =========================
+# CALIBRATION
+# =========================
+
 def mouse_cb(event, x, y, flags, param):
     global clicked_points
     if event == cv2.EVENT_LBUTTONDOWN and len(clicked_points) < 4:
@@ -66,15 +74,16 @@ def calibrate_with_frame_source(frame_source, source_type="capture"):
     print("4) a1 (bottom-left)")
     print("Press Q when done, ESC to cancel\n")
 
+    # Destroy any existing windows first
     cv2.destroyAllWindows()
-    cv2.waitKey(100) 
+    cv2.waitKey(100)  # Wait for windows to close
     
     cv2.namedWindow("calibrate", cv2.WINDOW_NORMAL | cv2.WINDOW_KEEPRATIO)
     cv2.resizeWindow("calibrate", 800, 600)
     cv2.setMouseCallback("calibrate", mouse_cb)
 
     start_time = time.time()
-    timeout = 60  
+    timeout = 60  # 60 second timeout
     frame_count = 0
     
     try:
@@ -89,9 +98,10 @@ def calibrate_with_frame_source(frame_source, source_type="capture"):
                     time.sleep(0.1)
                     continue
             elif source_type == "frames":
+                # Get frame from threading source
                 try:
                     with frame_lock:
-                        if frame_source[1] is not None: 
+                        if frame_source[1] is not None:  # top camera frame
                             frame = frame_source[1].copy()
                 except Exception as e:
                     print(f"Frame access error: {e}")
@@ -99,23 +109,27 @@ def calibrate_with_frame_source(frame_source, source_type="capture"):
                     continue
                 
                 if frame is None:
-                    if frame_count % 100 == 0: 
+                    if frame_count % 100 == 0:  # Print every 100 attempts
                         print("Waiting for camera frame...")
                     time.sleep(0.05)
                     continue
 
+            # Create frame copy to avoid modifying original
             display_frame = frame.copy()
 
+            # Draw clicked points with better visibility
             for i, p in enumerate(clicked_points):
                 cv2.circle(display_frame, p, 10, (0, 0, 255), -1)
                 cv2.circle(display_frame, p, 12, (255, 255, 255), 2)
                 cv2.putText(display_frame, str(i+1), (p[0]+15, p[1]-15), 
                            cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
 
+            # Show instructions with better visibility
             instruction_text = f"Click point {len(clicked_points)+1}/4"
             if len(clicked_points) == 4:
                 instruction_text = "Press Q to save calibration"
                 
+            # Create instruction overlay
             overlay = display_frame.copy()
             cv2.rectangle(overlay, (5, 5), (500, 45), (0, 0, 0), -1)
             cv2.addWeighted(overlay, 0.7, display_frame, 0.3, 0, display_frame)
@@ -123,6 +137,7 @@ def calibrate_with_frame_source(frame_source, source_type="capture"):
             cv2.putText(display_frame, instruction_text, 
                        (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
 
+            # Add corner labels to help user
             corner_labels = ["a8 (TOP-LEFT)", "h8 (TOP-RIGHT)", "h1 (BOTTOM-RIGHT)", "a1 (BOTTOM-LEFT)"]
             if len(clicked_points) < 4:
                 cv2.putText(display_frame, f"Next: {corner_labels[len(clicked_points)]}", 
@@ -130,21 +145,23 @@ def calibrate_with_frame_source(frame_source, source_type="capture"):
 
             cv2.imshow("calibrate", display_frame)
 
+            # Use shorter waitKey to prevent freezing
             key = cv2.waitKey(1) & 0xFF
             if key == ord('q') and len(clicked_points) == 4:
                 print("Saving calibration...")
                 break
-            elif key == 27:  
+            elif key == 27:  # ESC key
                 print("Calibration cancelled by user")
                 cv2.destroyWindow("calibrate")
                 cv2.waitKey(100)
                 return None
-            elif key == ord('c'):
+            elif key == ord('c'):  # Clear points
                 clicked_points = []
                 print("Cleared calibration points")
 
+        # Clean up window
         cv2.destroyWindow("calibrate")
-        cv2.waitKey(100)  
+        cv2.waitKey(100)  # Ensure window is destroyed
 
         if len(clicked_points) != 4:
             print(f"Calibration failed: got {len(clicked_points)} points, need 4")
@@ -154,6 +171,7 @@ def calibrate_with_frame_source(frame_source, source_type="capture"):
 
         calib = {"points": clicked_points}
         
+        # Validate calibration points (basic check)
         if len(set(clicked_points)) != 4:
             print("Error: Duplicate calibration points detected")
             return None
@@ -185,6 +203,10 @@ def calibrate(cap):
 def load_calibration():
     with open(CALIB_FILE, "r") as f:
         return json.load(f)
+
+# =========================
+# VISION
+# =========================
 
 def warp_board(frame, pts):
     src = np.array(pts, dtype=np.float32)
@@ -222,6 +244,7 @@ def calibrate_piece_colors(rotated_board):
     board_colors = []
     piece_colors = []
     
+    # Sample empty squares first
     print("\nStep 1: Click on 3-4 EMPTY squares of different colors")
     print("Click squares, then press SPACE to continue")
     
@@ -232,6 +255,7 @@ def calibrate_piece_colors(rotated_board):
     
     def color_mouse_cb(event, x, y, flags, param):
         if event == cv2.EVENT_LBUTTONDOWN:
+            # Find which square was clicked
             c = x // sq
             r = y // sq
             if 0 <= r < 8 and 0 <= c < 8:
@@ -239,7 +263,8 @@ def calibrate_piece_colors(rotated_board):
                 x2, y2 = x1 + sq, y1 + sq
                 square_img = rotated_board[y1:y2, x1:x2]
                 
-                center = center_crop(square_img, 0.3)  
+                # Get average color of the center area
+                center = center_crop(square_img, 0.3)  # Use more of the square
                 if center is not None:
                     avg_color = np.mean(center.reshape(-1, 3), axis=0)
                     file_char = chr(ord('a') + c)
@@ -251,13 +276,16 @@ def calibrate_piece_colors(rotated_board):
     
     cv2.setMouseCallback("color_calib", color_mouse_cb)
     
+    # Sample empty squares
     while True:
         display_board = rotated_board.copy()
         
+        # Draw grid
         for r in range(1, 8):
             cv2.line(display_board, (0, r * sq), (BOARD_SIZE, r * sq), (255, 0, 0), 1)
             cv2.line(display_board, (r * sq, 0), (r * sq, BOARD_SIZE), (255, 0, 0), 1)
         
+        # Mark clicked squares
         for _, _, x, y in clicked_samples:
             cv2.circle(display_board, (x, y), 10, (0, 255, 0), -1)
         
@@ -275,20 +303,24 @@ def calibrate_piece_colors(rotated_board):
             cv2.destroyWindow("color_calib")
             return None
     
+    # Store board colors
     board_colors = [color for _, color, _, _ in clicked_samples]
     
+    # Now sample pieces
     print(f"\nStep 2: Click on 3-4 squares with PIECES")
     print("Click squares with pieces, then press SPACE to continue")
     
-    clicked_samples = []  
+    clicked_samples = []  # Reset for pieces
     
     while True:
         display_board = rotated_board.copy()
         
+        # Draw grid
         for r in range(1, 8):
             cv2.line(display_board, (0, r * sq), (BOARD_SIZE, r * sq), (255, 0, 0), 1)
             cv2.line(display_board, (r * sq, 0), (r * sq, BOARD_SIZE), (255, 0, 0), 1)
         
+        # Mark clicked squares  
         for _, _, x, y in clicked_samples:
             cv2.circle(display_board, (x, y), 10, (0, 0, 255), -1)
         
@@ -302,22 +334,26 @@ def calibrate_piece_colors(rotated_board):
         key = cv2.waitKey(1) & 0xFF
         if key == ord(' ') and len(clicked_samples) >= 3:
             break
-        elif key == 27:  
+        elif key == 27:  # ESC
             cv2.destroyWindow("color_calib")
             return None
     
+    # Store piece colors
     piece_colors = [color for _, color, _, _ in clicked_samples]
     
     cv2.destroyWindow("color_calib")
     
+    # Calculate average colors and thresholds
     avg_board_color = np.mean(board_colors, axis=0)
     avg_piece_color = np.mean(piece_colors, axis=0)
     
+    # Calculate color distance threshold
     color_distances = []
     for piece_color in piece_colors:
         min_dist = min([np.linalg.norm(piece_color - board_color) for board_color in board_colors])
         color_distances.append(min_dist)
     
+    # Use 80% of the minimum distance as threshold
     color_threshold = np.mean(color_distances) * 0.8
     
     print(f"\nCalibration Results:")
@@ -325,6 +361,7 @@ def calibrate_piece_colors(rotated_board):
     print(f"Average piece color: RGB({avg_piece_color[2]:.1f}, {avg_piece_color[1]:.1f}, {avg_piece_color[0]:.1f})")
     print(f"Color distance threshold: {color_threshold:.1f}")
     
+    # Save calibration
     calib_data = {
         'board_colors': [c.tolist() for c in board_colors],
         'piece_colors': [c.tolist() for c in piece_colors], 
@@ -358,17 +395,21 @@ def is_occupied_color_based(square, color_calib=None):
     Detect pieces based on color calibration
     """
     if square is None or square.size == 0 or color_calib is None:
-        return is_occupied(square) 
+        return is_occupied(square)  # Fallback to original method
     
+    # Get center area of square
     center = center_crop(square, 0.3)
     if center is None:
         return False
     
+    # Get average color
     avg_color = np.mean(center.reshape(-1, 3), axis=0)
     
+    # Calculate distance to board colors
     board_colors = [np.array(c) for c in color_calib['board_colors']]
     min_board_distance = min([np.linalg.norm(avg_color - board_color) for board_color in board_colors])
     
+    # If distance is greater than threshold, it's likely a piece
     threshold = color_calib['color_threshold']
     is_piece = min_board_distance > threshold
     
@@ -419,6 +460,7 @@ def is_occupied_with_baseline(square, baseline=None, threshold_multiplier=1.5):
     if square is None or square.size == 0:
         return False
     
+    # Convert to different color spaces for analysis
     gray = cv2.cvtColor(square, cv2.COLOR_BGR2GRAY)
     hsv = cv2.cvtColor(square, cv2.COLOR_BGR2HSV)
     
