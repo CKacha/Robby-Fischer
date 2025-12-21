@@ -1145,11 +1145,22 @@ def main():
                 thread.join()
             return
 
-    cv2.namedWindow("board", cv2.WINDOW_NORMAL)
-    cv2.resizeWindow("board", 900, 900)
-    
-    cv2.namedWindow("analysis", cv2.WINDOW_NORMAL)
-    cv2.resizeWindow("analysis", 400, 600)
+    # Try to create windows with error handling for headless systems
+    try:
+        cv2.namedWindow("board", cv2.WINDOW_NORMAL)
+        cv2.resizeWindow("board", 900, 900)
+        
+        cv2.namedWindow("analysis", cv2.WINDOW_NORMAL)
+        cv2.resizeWindow("analysis", 400, 600)
+        
+        gui_available = True
+        print("GUI windows available")
+    except cv2.error as e:
+        gui_available = False
+        print(f"⚠️  GUI not available: {e}")
+        print("Running in headless mode - no visual output")
+        print("Install GUI support with: sudo apt install libgtk2.0-dev pkg-config")
+        print("Then reinstall opencv: pip uninstall opencv-python && pip install opencv-python")
 
     print("\nRUNNING")
     print("Controls:")
@@ -1328,6 +1339,7 @@ def main():
                                     waiting_for_human_move = False
                                     waiting_for_robot_move = True
                                     
+                                    print("💭 Robot's turn - getting next demo move...")
                                     if not current_board.is_game_over():
                                         robot_move = get_demo_move(current_board, demo_mode)
                                         if robot_move:
@@ -1412,7 +1424,8 @@ def main():
                        (10, BOARD_SIZE - 20), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 255), 2)
 
         # Display the warped, rotated board
-        cv2.imshow("board", rotated_board)
+        if gui_available:
+            cv2.imshow("board", rotated_board)
 
         # Show all camera views stacked horizontally
         top_view_resized = cv2.resize(top_view, (300, 300))
@@ -1420,7 +1433,8 @@ def main():
         wrist_view_resized = cv2.resize(wrist_view, (300, 300))
 
         combined_view = np.hstack((top_view_resized, side_view_resized, wrist_view_resized))
-        cv2.imshow("camera views", combined_view)
+        if gui_available:
+            cv2.imshow("camera views", combined_view)
         
         # Create analysis display
         analysis_img = np.zeros((600, 400, 3), dtype=np.uint8)
@@ -1487,10 +1501,35 @@ def main():
                    (10, 585), cv2.FONT_HERSHEY_SIMPLEX, 0.4, 
                    (0, 255, 0) if move_detection_active else (255, 0, 0), 1)
         
-        cv2.imshow("analysis", analysis_img)
+        if gui_available:
+            cv2.imshow("analysis", analysis_img)
+        else:
+            # In headless mode, print status periodically
+            if move_counter > 0 and move_counter % 10 == 0:  # Every 10 moves
+                print(f"\n=== STATUS UPDATE ===")
+                print(f"Move #{move_counter}")
+                print(f"Turn: {'White' if current_board.turn else 'Black'}")
+                if last_suggestion:
+                    print(f"Current suggestion: {last_suggestion}")
+                if waiting_for_human_move:
+                    print("Waiting for HUMAN move")
+                elif waiting_for_robot_move:
+                    print("Execute ROBOT move!")
+                print("========================\n")
 
-        # Key detection
-        key = cv2.waitKey(1) & 0xFF
+        # Key detection - handle both GUI and headless modes
+        if gui_available:
+            key = cv2.waitKey(1) & 0xFF
+        else:
+            # Headless mode - use select for non-blocking input
+            import sys
+            import select
+            
+            key = 255  # No key pressed
+            if select.select([sys.stdin], [], [], 0.001) == ([sys.stdin], [], []):
+                input_line = sys.stdin.readline().strip().lower()
+                if input_line:
+                    key = ord(input_line[0]) if input_line else 255
         if key == ord('q'):
             break
         elif key == ord('r'):
