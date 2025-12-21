@@ -7,8 +7,11 @@
 </h1>
 
 
+<div align="center">
+  
 Robby Fischer is a chess-playing robotic arm system that uses computer vision and imitation Learning AI to play chess autonomously against human opponents!
 
+<div align="center">
 ## Overview
 
 ChessArm is an intelligent chess system that:
