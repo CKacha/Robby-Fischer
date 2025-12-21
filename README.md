@@ -1,20 +1,22 @@
 <h1 align="center">
   <br>
-  <a href="https://notaroomba.dev"><img src="https://hc-cdn.hel1.your-objectstorage.com/s/v3/d1252b6d5ee8f6e7_group_3.png" width="200"></a>
+  <a href="https://blueprint.hackclub.com/prototype"><img src="https://hc-cdn.hel1.your-objectstorage.com/s/v3/d1252b6d5ee8f6e7_group_3.png" width="200"></a>
   <br>
   Robby Fischer
   <br>
 </h1>
 
 
-<div align="center">
+<h4 align="center">
   
 Robby Fischer is a chess-playing robotic arm system that uses computer vision and imitation Learning AI to play chess autonomously against human opponents!
 
+</h4>
 
-</div>
+<div align="center">
 
-## Overview
+![Hack Club](https://img.shields.io/badge/Hack_Club-33d6a6.svg?style=for-the-badge&logo=hackclub&logoColor=white)
+![AMD](https://img.shields.io/badge/AMD-ed1c24.svg?style=for-the-badge&logo=amd&logoColor=white)
 
 ChessArm is an intelligent chess system that:
 - **Captures** the board state using multiple cameras that track the 
