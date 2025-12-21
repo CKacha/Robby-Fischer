@@ -1,0 +1,53 @@
+🚀 Starting LeRobot execution...
+   (This will control the robot arm to execute the move)
+   Press Ctrl+C to abort if needed
+
+Traceback (most recent call last):
+  File "/home/bor3d/Documents/GitHub/ChessArm/.venv/lib/python3.13/site-packages/draccus/parsers/decoding.py", line 133, in decode_dataclass
+    field_value = get_decoding_fn(field_type)(raw_value, (*path, name))
+  File "/home/bor3d/Documents/GitHub/ChessArm/.venv/lib/python3.13/site-packages/draccus/parsers/decoding.py", line 463, in _decode_dict
+    items = raw_value.items()
+            ^^^^^^^^^^^^^^^
+AttributeError: 'str' object has no attribute 'items'
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/bor3d/Documents/GitHub/ChessArm/.venv/bin/lerobot-record", line 7, in <module>
+    sys.exit(main())
+             ~~~~^^
+  File "/home/bor3d/Documents/GitHub/ChessArm/.venv/lib/python3.13/site-packages/lerobot/scripts/lerobot_record.py", line 516, in main
+    record()
+    ~~~~~~^^
+  File "/home/bor3d/Documents/GitHub/ChessArm/.venv/lib/python3.13/site-packages/lerobot/configs/parser.py", line 232, in wrapper_inner
+    cfg = draccus.parse(config_class=argtype, config_path=config_path, args=cli_args)
+  File "/home/bor3d/Documents/GitHub/ChessArm/.venv/lib/python3.13/site-packages/draccus/argparsing.py", line 211, in parse
+    return parser.parse_args(args)
+           ~~~~~~~~~~~~~~~~~^^^^^^
+  File "/home/bor3d/Documents/GitHub/ChessArm/.venv/lib/python3.13/site-packages/draccus/argparsing.py", line 102, in parse_args
+    args, _ = self.parse_known_args(args, namespace, is_parse_args=True)
+              ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/bor3d/Documents/GitHub/ChessArm/.venv/lib/python3.13/site-packages/draccus/argparsing.py", line 136, in parse_known_args
+    parsed_t = self._postprocessing(parsed_args)
+  File "/home/bor3d/Documents/GitHub/ChessArm/.venv/lib/python3.13/site-packages/draccus/argparsing.py", line 180, in _postprocessing
+    cfg = decoding.decode(self.config_class, deflat_d)
+  File "/home/bor3d/Documents/GitHub/ChessArm/.venv/lib/python3.13/site-packages/draccus/parsers/registry_utils.py", line 78, in wrapper
+    return base_func(*args, **kw)
+  File "/home/bor3d/Documents/GitHub/ChessArm/.venv/lib/python3.13/site-packages/draccus/parsers/decoding.py", line 48, in decode
+    return get_decoding_fn(cls)(raw_value, ())  # type: ignore
+           ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^
+  File "/home/bor3d/Documents/GitHub/ChessArm/.venv/lib/python3.13/site-packages/draccus/parsers/decoding.py", line 135, in decode_dataclass
+    raise e
+  File "/home/bor3d/Documents/GitHub/ChessArm/.venv/lib/python3.13/site-packages/draccus/parsers/decoding.py", line 133, in decode_dataclass
+    field_value = get_decoding_fn(field_type)(raw_value, (*path, name))
+  File "/home/bor3d/Documents/GitHub/ChessArm/.venv/lib/python3.13/site-packages/draccus/parsers/decoding.py", line 201, in decode_choice_class
+    return decode_dataclass(subcls, raw_value, path)
+  File "/home/bor3d/Documents/GitHub/ChessArm/.venv/lib/python3.13/site-packages/draccus/parsers/decoding.py", line 137, in decode_dataclass
+    raise DecodingError(
+    ...<3 lines>...
+    ) from e
+draccus.utils.DecodingError: `robot.cameras`: Failed when parsing value='{wrist: {type: opencv, index_or_path: 5, width: 640, height: 480, fps: 30}, corner: {type: opencv, index_or_path: 2, width: 640, height: 480, fps: 30}, top: {type: opencv, index_or_path: 10, width: 640, height: 480, fps: 30}, side: {type: opencv, index_or_path: 6, width: 640, height: 480, fps: 30}}' into field "<class 'lerobot.robots.so101_follower.config_so101_follower.SO101FollowerConfig'>.cameras" of type dict[str, lerobot.cameras.configs.CameraConfig].
+        Underlying error is "AttributeError: 'str' object has no attribute 'items'"
+❌ LeRobot execution failed (exit code: 1)
+❌ LeRobot execution failed - suggestion still available
+   You can try again with 'L' or execute manually and press 'C'
