@@ -487,8 +487,8 @@ def is_occupied_with_baseline(square, baseline=None, threshold_multiplier=1.5):
 
 def is_occupied(square):
     """
-    Enhanced piece detection using color differences and multiple detection methods
-    Assumes pieces have different color than the board squares
+    Enhanced piece detection optimized for red and white chess pieces
+    Red pieces = robot/black, White pieces = human/white
     """
     if square is None or square.size == 0:
         return False
@@ -504,6 +504,51 @@ def is_occupied(square):
     
     if center_crop_sq.size == 0:
         return False
+    
+    # SPECIFIC RED PIECE DETECTION (for 3D printed red pieces)
+    # Red pieces detection in HSV space
+    hsv_center = cv2.cvtColor(center_crop_sq, cv2.COLOR_BGR2HSV)
+    hsv_full = cv2.cvtColor(square, cv2.COLOR_BGR2HSV)
+    
+    # Red color ranges in HSV (red wraps around 0/180)
+    # Expanded ranges for 3D printed red pieces
+    # Lower red range (0-15 hue) - more permissive
+    red_lower1 = np.array([0, 30, 30])  # Lower saturation/value for darker reds
+    red_upper1 = np.array([15, 255, 255])
+    # Upper red range (165-180 hue) - more permissive  
+    red_lower2 = np.array([165, 30, 30])
+    red_upper2 = np.array([180, 255, 255])
+    
+    red_mask1 = cv2.inRange(hsv_center, red_lower1, red_upper1)
+    red_mask2 = cv2.inRange(hsv_center, red_lower2, red_upper2)
+    red_mask_center = red_mask1 + red_mask2
+    
+    # Also check full square for red
+    red_mask1_full = cv2.inRange(hsv_full, red_lower1, red_upper1)
+    red_mask2_full = cv2.inRange(hsv_full, red_lower2, red_upper2)
+    red_mask_full = red_mask1_full + red_mask2_full
+    
+    red_ratio_center = np.sum(red_mask_center > 0) / red_mask_center.size
+    red_ratio_full = np.sum(red_mask_full > 0) / red_mask_full.size
+    
+    # More permissive thresholds for red detection
+    red_piece_detected = red_ratio_center > 0.08 or red_ratio_full > 0.05  # Lower thresholds
+    
+    # SPECIFIC WHITE PIECE DETECTION
+    # White pieces detection - high brightness, low saturation
+    center_gray = cv2.cvtColor(center_crop_sq, cv2.COLOR_BGR2GRAY)
+    center_hsv = cv2.cvtColor(center_crop_sq, cv2.COLOR_BGR2HSV)
+    
+    # White detection criteria
+    avg_brightness = center_gray.mean()
+    avg_saturation = center_hsv[:,:,1].mean()
+    
+    # White pieces should be bright with low saturation
+    white_piece_detected = (avg_brightness > 180 and avg_saturation < 50) or avg_brightness > 220
+    
+    # If we detect specific colored pieces, return True immediately
+    if red_piece_detected or white_piece_detected:
+        return True
     
     # Method 1: Color variance - pieces should have more color variation
     color_variance = np.var(gray)
@@ -583,7 +628,9 @@ def is_occupied(square):
     # Require at least 55% confidence (adjustable)
     is_piece_present = confidence >= 0.55
     
-    # Debug output for calibration (uncomment to tune thresholds)
+    # Debug output for piece detection (uncomment to tune thresholds)
+    # print(f"Red ratio center: {red_ratio_center:.3f}, full: {red_ratio_full:.3f}")
+    # print(f"White brightness: {avg_brightness:.1f}, saturation: {avg_saturation:.1f}")
     # print(f"Var:{color_variance:.1f}({variance_occupied}) Edge:{edge_density:.3f}({edge_occupied}) "
     #       f"Bright:{brightness_diff:.1f}({brightness_occupied}) Sat:{saturation:.1f}({saturation_occupied}) "
     #       f"LAB:{lab_deviation:.1f}({lab_occupied}) Texture:{texture_measure:.1f}({texture_occupied}) "
@@ -591,6 +638,185 @@ def is_occupied(square):
     #       f"-> Confidence: {confidence:.2f} = {is_piece_present}")
     
     return is_piece_present
+
+def debug_piece_detection(square):
+    """
+    Debug function to analyze a square and print detailed color information
+    """
+    if square is None or square.size == 0:
+        print("Invalid square")
+        return
+    
+    # Convert to different color spaces
+    gray = cv2.cvtColor(square, cv2.COLOR_BGR2GRAY)
+    hsv = cv2.cvtColor(square, cv2.COLOR_BGR2HSV)
+    
+    # Get center crop for analysis
+    h, w = square.shape[:2]
+    center_crop_sq = square[h//4:3*h//4, w//4:3*w//4]
+    
+    if center_crop_sq.size > 0:
+        center_hsv = cv2.cvtColor(center_crop_sq, cv2.COLOR_BGR2HSV)
+        center_gray = cv2.cvtColor(center_crop_sq, cv2.COLOR_BGR2GRAY)
+        
+        # Red detection
+        red_lower1 = np.array([0, 30, 30])
+        red_upper1 = np.array([15, 255, 255])
+        red_lower2 = np.array([165, 30, 30])
+        red_upper2 = np.array([180, 255, 255])
+        
+        red_mask1 = cv2.inRange(center_hsv, red_lower1, red_upper1)
+        red_mask2 = cv2.inRange(center_hsv, red_lower2, red_upper2)
+        red_mask = red_mask1 + red_mask2
+        red_ratio = np.sum(red_mask > 0) / red_mask.size
+        
+        # White detection
+        avg_brightness = center_gray.mean()
+        avg_saturation = center_hsv[:,:,1].mean()
+        
+        print(f"DEBUG ANALYSIS:")
+        print(f"  Average HSV: H={center_hsv[:,:,0].mean():.1f}, S={center_hsv[:,:,1].mean():.1f}, V={center_hsv[:,:,2].mean():.1f}")
+        print(f"  Average BGR: B={square[:,:,0].mean():.1f}, G={square[:,:,1].mean():.1f}, R={square[:,:,2].mean():.1f}")
+        print(f"  Red ratio: {red_ratio:.3f} (threshold: 0.08)")
+        print(f"  White brightness: {avg_brightness:.1f} (threshold: 180)")
+        print(f"  White saturation: {avg_saturation:.1f} (threshold: <50)")
+        print(f"  RED detected: {red_ratio > 0.08}")
+        print(f"  WHITE detected: {(avg_brightness > 180 and avg_saturation < 50) or avg_brightness > 220}")
+        print(f"  OCCUPIED: {is_occupied(square)}")
+        print("")
+
+def test_piece_detection_on_board(rotated_board):
+    """
+    Test piece detection on all squares and show results
+    """
+    print("\n=== PIECE DETECTION TEST ===")
+    sq = BOARD_SIZE // 8
+    
+    for r in range(8):
+        row_results = []
+        for c in range(8):
+            x1 = c * sq
+            y1 = r * sq
+            x2 = x1 + sq
+            y2 = y1 + sq
+            
+            square = rotated_board[y1:y2, x1:x2]
+            square_c = center_crop(square, CENTER_MARGIN)
+            
+            file_char = chr(ord('a') + c)
+            rank_char = str(8 - r)
+            square_name = f"{file_char}{rank_char}"
+            
+            occupied = is_occupied(square_c)
+            row_results.append('●' if occupied else '○')
+        
+        print(f"Rank {8-r}: {' '.join(row_results)}")
+    
+    print("     a b c d e f g h")
+    print("Legend: ● = Occupied, ○ = Empty")
+    print("")
+
+def debug_red_piece_detection(rotated_board):
+    """
+    Interactive debug mode for red piece detection
+    Click on squares to see detailed red detection analysis
+    """
+    print("\n=== RED PIECE DEBUG MODE ===")
+    print("Click on squares to analyze red detection")
+    print("Press ESC to exit")
+    
+    sq = BOARD_SIZE // 8
+    
+    cv2.namedWindow("red_debug", cv2.WINDOW_NORMAL)
+    cv2.resizeWindow("red_debug", 800, 800)
+    
+    def red_debug_mouse_cb(event, x, y, flags, param):
+        if event == cv2.EVENT_LBUTTONDOWN:
+            # Find which square was clicked
+            c = x // sq
+            r = y // sq
+            if 0 <= r < 8 and 0 <= c < 8:
+                x1, y1 = c * sq, r * sq
+                x2, y2 = x1 + sq, y1 + sq
+                square_img = rotated_board[y1:y2, x1:x2]
+                
+                file_char = chr(ord('a') + c)
+                rank_char = str(8 - r)
+                square_name = f"{file_char}{rank_char}"
+                
+                print(f"\n--- ANALYZING SQUARE {square_name} ---")
+                
+                # Get center crop
+                center = center_crop(square_img, 0.3)
+                if center is not None:
+                    # Convert to HSV
+                    hsv_square = cv2.cvtColor(square_img, cv2.COLOR_BGR2HSV)
+                    hsv_center = cv2.cvtColor(center, cv2.COLOR_BGR2HSV)
+                    
+                    # Red detection ranges
+                    red_lower1 = np.array([0, 30, 30])
+                    red_upper1 = np.array([15, 255, 255])
+                    red_lower2 = np.array([165, 30, 30])
+                    red_upper2 = np.array([180, 255, 255])
+                    
+                    # Test different red ranges
+                    red_mask1_center = cv2.inRange(hsv_center, red_lower1, red_upper1)
+                    red_mask2_center = cv2.inRange(hsv_center, red_lower2, red_upper2)
+                    red_mask_center = red_mask1_center + red_mask2_center
+                    
+                    red_mask1_full = cv2.inRange(hsv_square, red_lower1, red_upper1)
+                    red_mask2_full = cv2.inRange(hsv_square, red_lower2, red_upper2)
+                    red_mask_full = red_mask1_full + red_mask2_full
+                    
+                    red_ratio_center = np.sum(red_mask_center > 0) / red_mask_center.size
+                    red_ratio_full = np.sum(red_mask_full > 0) / red_mask_full.size
+                    
+                    # Average colors
+                    avg_hsv_center = np.mean(hsv_center.reshape(-1, 3), axis=0)
+                    avg_bgr = np.mean(square_img.reshape(-1, 3), axis=0)
+                    
+                    print(f"Average BGR: B={avg_bgr[0]:.1f}, G={avg_bgr[1]:.1f}, R={avg_bgr[2]:.1f}")
+                    print(f"Average HSV (center): H={avg_hsv_center[0]:.1f}, S={avg_hsv_center[1]:.1f}, V={avg_hsv_center[2]:.1f}")
+                    print(f"Red ratio (center): {red_ratio_center:.3f}")
+                    print(f"Red ratio (full): {red_ratio_full:.3f}")
+                    print(f"Red detected (threshold 0.08): {red_ratio_center > 0.08 or red_ratio_full > 0.05}")
+                    print(f"Is occupied: {is_occupied(square_img)}")
+                    
+                    # Show if this is likely a red piece
+                    if avg_bgr[2] > avg_bgr[0] and avg_bgr[2] > avg_bgr[1]:
+                        print("✅ BGR analysis suggests RED piece (R > B and R > G)")
+                    else:
+                        print("❌ BGR analysis does NOT suggest red piece")
+                    
+                    if 0 <= avg_hsv_center[0] <= 15 or 165 <= avg_hsv_center[0] <= 180:
+                        print("✅ HSV Hue suggests RED piece")
+                    else:
+                        print("❌ HSV Hue does NOT suggest red piece")
+    
+    cv2.setMouseCallback("red_debug", red_debug_mouse_cb)
+    
+    while True:
+        display_board = rotated_board.copy()
+        
+        # Draw grid
+        for r in range(1, 8):
+            cv2.line(display_board, (0, r * sq), (BOARD_SIZE, r * sq), (255, 0, 0), 1)
+            cv2.line(display_board, (r * sq, 0), (r * sq, BOARD_SIZE), (255, 0, 0), 1)
+        
+        # Add instructions
+        cv2.putText(display_board, "Click squares to debug red detection", 
+                   (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+        cv2.putText(display_board, "ESC to exit", 
+                   (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+        
+        cv2.imshow("red_debug", display_board)
+        
+        key = cv2.waitKey(1) & 0xFF
+        if key == 27:  # ESC
+            break
+    
+    cv2.destroyWindow("red_debug")
+    print("Red debug mode exited")
 
 # =========================
 # CHESS BOARD STATE DETECTION
@@ -850,6 +1076,8 @@ def main():
     print("  R = Recalibrate board position")
     print("  T = Tune piece detection thresholds")
     print("  P = Calibrate piece colors")
+    print("  B = Test piece detection on board")
+    print("  X = Debug red piece detection")
     print("  Q = Quit")
     print("")
     print("WORKFLOW:")
@@ -1211,6 +1439,30 @@ def main():
                         print("Color calibration updated!")
                     else:
                         print("Color calibration cancelled")
+                else:
+                    print("No camera frame available")
+        elif key == ord('b'):
+            # Test piece detection on current board
+            print("\n=== TESTING PIECE DETECTION ===")
+            with frame_lock:
+                if frames[1] is not None:
+                    test_frame = frames[1].copy()
+                    warped_test = warp_board(test_frame, calib["points"])
+                    rotated_test = rotate_board(warped_test)
+                    
+                    test_piece_detection_on_board(rotated_test)
+                else:
+                    print("No camera frame available")
+        elif key == ord('x'):
+            # Debug red piece detection
+            print("\n=== RED PIECE DEBUG MODE ===")
+            with frame_lock:
+                if frames[1] is not None:
+                    debug_frame = frames[1].copy()
+                    warped_debug = warp_board(debug_frame, calib["points"])
+                    rotated_debug = rotate_board(warped_debug)
+                    
+                    debug_red_piece_detection(rotated_debug)
                 else:
                     print("No camera frame available")
         elif key == ord('s'):
