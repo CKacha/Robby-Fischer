@@ -2,11 +2,10 @@
   <br>
   <a href="https://notaroomba.dev"><img src="https://hc-cdn.hel1.your-objectstorage.com/s/v3/d1252b6d5ee8f6e7_group_3.png" width="200"></a>
   <br>
-  Cyberboard V2
+  Robby Fischer
   <br>
 </h1>
 
-# Robby Fischer
 
 Robby Fischer is a chess-playing robotic arm system that uses computer vision and imitation Learning AI to play chess autonomously against human opponents!
 
