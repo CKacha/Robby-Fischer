@@ -101,7 +101,7 @@ lerobot-record \
   --dataset.single_task="pick up pawn and move it" \
   --dataset.repo_id=${HF_USER}/eval_act_base \
   --dataset.root=${PWD}/eval_lerobot_datasetp/ \
-  --dataset.episode_time_s=120 \
+  --dataset.episode_time_s=15 \
   --dataset.num_episodes=1 \
   --policy.path=Bor3dguy/act_so101_e7e5pawnv3
 
@@ -115,7 +115,7 @@ lerobot-record \
   --dataset.single_task="moving the knight" \
   --dataset.repo_id=${HF_USER}/eval_act_base \
   --dataset.root=${PWD}/eval_lerobot_datasetk/ \
-  --dataset.episode_time_s=60 \
+  --dataset.episode_time_s=15 \
   --dataset.num_episodes=1 \
   --policy.path=Bor3dguy/act_so101_knight
 
@@ -129,7 +129,7 @@ lerobot-record \
   --dataset.single_task="Bishop" \
   --dataset.repo_id=${HF_USER}/eval_act_base \
   --dataset.root=${PWD}/eval_lerobot_datasetb/ \
-  --dataset.episode_time_s=60 \
+  --dataset.episode_time_s=15 \
   --dataset.num_episodes=1 \
   --policy.path=Bor3dguy/act_so101_Bb4v1
 
@@ -143,6 +143,6 @@ CASTLE
   --dataset.single_task="Castle" \
   --dataset.repo_id=${HF_USER}/eval_act_base \
   --dataset.root=${PWD}/eval_lerobot_datasetc/ \
-  --dataset.episode_time_s=60 \
+  --dataset.episode_time_s=15 \
   --dataset.num_episodes=1 \
   --policy.path=Bor3dguy/act_so101_leftcastle
