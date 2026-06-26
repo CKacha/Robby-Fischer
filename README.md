@@ -53,13 +53,13 @@
 
 **Training the arm:**
 
-[Watch: Training the arm](https://user-cdn.hackclub-assets.com/019f0180-dcd9-735b-b312-794104c9e11b/training.mp4)
+<video src="https://github.com/user-attachments/assets/0e8f6b65-fb49-4176-8722-4db38d22dfb7" controls muted width="800"></video>
 
 **Demo runs:**
 
-[Watch: Demo 1](https://user-cdn.hackclub-assets.com/019f0176-952d-75bd-8b82-5ffd1d5720dc/demo.mp4)
+<video src="https://github.com/user-attachments/assets/5e9bfd6d-fc00-46bb-ad35-3a1e8c407205" controls muted width="800"></video>
 
-[Watch: Demo 2](https://user-cdn.hackclub-assets.com/019f017f-30d6-7498-bb61-2ad158cd68c0/demo1.mp4)
+<video src="https://github.com/user-attachments/assets/f8ae0c36-9d8a-4b76-ac57-83ef428b359a" controls muted width="800"></video>
 
 ---
 
