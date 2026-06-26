@@ -7,4 +7,3 @@ tests/artifacts/
 # Large binary model/data files
 *.safetensors
 *.bag
-*.png
