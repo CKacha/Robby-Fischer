@@ -45,7 +45,7 @@
 
 ### Project Image
 
-<img src="images/chess.png" alt="Robby_Fischer_Board_Tracker" width="800"/>
+<img src="https://raw.githubusercontent.com/TaniWanKenobi/Robby-Fischer/main/images/chess.png" alt="Robby_Fischer_Board_Tracker" width="800"/>
 
 ---
 
@@ -53,13 +53,19 @@
 
 **Training the arm:**
 
-<video src="https://user-cdn.hackclub-assets.com/019f0180-dcd9-735b-b312-794104c9e11b/training.mp4" controls muted width="800"></video>
+<video controls muted width="800">
+  <source src="https://user-cdn.hackclub-assets.com/019f0180-dcd9-735b-b312-794104c9e11b/training.mp4" type="video/mp4">
+</video>
 
 **Demo runs:**
 
-<video src="https://user-cdn.hackclub-assets.com/019f0176-952d-75bd-8b82-5ffd1d5720dc/demo.mp4" controls muted width="800"></video>
+<video controls muted width="800">
+  <source src="https://user-cdn.hackclub-assets.com/019f0176-952d-75bd-8b82-5ffd1d5720dc/demo.mp4" type="video/mp4">
+</video>
 
-<video src="https://user-cdn.hackclub-assets.com/019f017f-30d6-7498-bb61-2ad158cd68c0/demo1.mp4" controls muted width="800"></video>
+<video controls muted width="800">
+  <source src="https://user-cdn.hackclub-assets.com/019f017f-30d6-7498-bb61-2ad158cd68c0/demo1.mp4" type="video/mp4">
+</video>
 
 ---
 
