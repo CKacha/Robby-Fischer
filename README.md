@@ -9,7 +9,7 @@
 </h1>
 
 <h4 align="center">
-  Robby Fischer is a chess-playing robotic arm system that uses computer vision and imitation learning AI to play chess autonomously against human opponents.
+  A chess-playing robotic arm that sees the board through cameras, thinks with the Stockfish engine, and physically moves pieces using the LeRobot SO-ARM101 arm.
 </h4>
 
 <div align="center">
@@ -34,71 +34,97 @@
 
 ### Our Team!
 
-**Team Name:** TPC 
+**Team Name:** TPC
 
 **Team Number:** 18
 
-**GitHub Usernames:**  
+**GitHub Usernames:**
 - @TaniWanKenobi
-- @techn1-cal  
-- @ChanminK
-  
+- @techn1-cal
+- @Ckacha
+
 ### Project Image
 
-<img src="MISSING PROJECT IMAGE URL" alt="Robby_Fischer_Build" width="800"/>
+<img src="images/chess.png" alt="Robby_Fischer_Board_Tracker" width="800"/>
 
 ---
 
 ## Project Media
 
-<img src="MISSING PROJECT IMAGE URL" alt="Robby_Fischer_Build" width="800"/>
+**Training the arm:**
 
-(insert video here )
+<video src="images/Training.mp4" controls width="800"></video>
 
----
+**Demo runs:**
 
+<video src="images/demo.mp4" controls width="800"></video>
 
-
-## BOM
-
-- Hugging Face LeRobot SO-ARM101
-- AMD PC
-- USB Cameras (x3)
-- Chess Board (3D printed)
-- Chess Pieces (3D printed)
+<video src="images/demo1.mp4" controls width="800"></video>
 
 ---
 
+## Hardware
+
+**Bill of Materials:**
+
+| Component | Purpose |
+|---|---|
+| Hugging Face LeRobot SO-ARM101 | Robotic arm that physically moves chess pieces |
+| AMD PC | Runs all vision, chess engine, and arm control software |
+| USB Cameras x3 | Wrist-mounted, top-down, and side-angle board views |
+| Chess Board (3D printed) | Custom board sized and colored for vision detection |
+| Chess Pieces (3D printed) | Custom pieces with consistent brightness for detection |
+
+---
 
 ## Overview
 
-ChessArm is an intelligent robotic chess system that:
+Robby Fischer is a fully autonomous chess-playing robot. A human sits down, makes their move on the physical board, and the robot handles everything else: it sees what happened, calculates the best response, and physically moves its own piece.
 
-- **Captures** the board state using multiple calibrated cameras
-- **Detects** opponent moves via vision-based piece tracking
-- **Analyzes** board positions using the Stockfish chess engine
-- **Executes** moves using the Hugging Face LeRobot SO-ARM101 robotic arm
+**How it works end-to-end:**
 
-**Game Flow:**  
-Camera Input → Board Detection → Stockfish AI → Arm Execution → Repeat
+1. **Board Detection:** Three USB cameras capture the board simultaneously. The top-down camera is the primary source; it's warped via a 4-point perspective transform (homography) to produce a clean bird's-eye view of all 64 squares.
+
+2. **Move Detection:** After the human moves, the system compares the current board image against the previous state. Each square is analyzed using a voting system across three methods: brightness threshold, edge density, and texture variance. If two of three methods agree a square changed, it's flagged, giving the system the "from" and "to" squares of the human's move.
+
+3. **Chess Engine:** The detected move is validated against a tracked `chess.Board` state using the `python-chess` library. If the move is legal, it's applied and Stockfish calculates the best response at depth 15, or with a 1-second time limit.
+
+4. **Arm Execution:** The LeRobot SO-ARM101 arm executes the engine's chosen move on the physical board, completing the loop.
+
+**Game Flow:**
+
+```
+Camera Input → Perspective Warp → Square Occupancy Detection → Move Validation → Stockfish → Arm Execution → Repeat
+```
+
+Human plays White and moves first. The robot plays Black.
 
 ---
 
 ## Features
 
-- **Multi-Camera System**: Three cameras (wrist, top-down, side)
-- **Perspective Calibration**: Automatic 4-point homography correction
-- **Piece Detection**: Brightness-based occupancy detection (threshold = 140)
-- **AI Integration**: Stockfish engine with 2-second move time limit
-- **Turn Logic**: Alternates between human (White) and robot (Red)
+- **Triple-Camera System:** Wrist, top-down, and side-angle cameras run in parallel threads for continuous board monitoring.
+- **Perspective Calibration:** A saved 4-point calibration (`board_calib_4pt.json`) maps the physical board to a corrected 800x800 pixel top-down view on every run.
+- **Robust Piece Detection:** Occupancy uses a 3-method voting system (brightness, edge density, variance) so a single noisy reading doesn't cause false moves.
+- **Stockfish Integration:** Full chess engine analysis with move suggestions, position evaluation, and legal move validation through `python-chess`.
+- **Live Board Visualization:** OpenCV windows display the warped board with per-square occupancy indicators and an arrow overlay showing the suggested move.
+- **Manual Override:** Keyboard controls let the operator confirm moves, enter moves manually, request hints, or start a new game at any time.
 
-# Credits
+---
 
-This project uses the following open-source projects
+## Wiring Diagram
 
-- **Onshape** was used to CAD the chess pieces and board
-- **AMD** and **Hack Club** provided the hardware and software resources we used!
-- **OpenCV** was used for image processing and computer vision tasks
-- **Stockfish** was used for chess engine analysis
+*(coming soon)*
 
+---
 
+## Credits
+
+This project was built with the following open-source tools and sponsors:
+
+- **[Hack Club](https://hackclub.com/) & [AMD](https://www.amd.com/):** provided the hardware and resources that made this project possible
+- **[LeRobot (Hugging Face)](https://github.com/huggingface/lerobot):** SO-ARM101 robotic arm platform and control software
+- **[Stockfish](https://stockfishchess.org/):** open-source chess engine used for move analysis and decision-making
+- **[OpenCV](https://opencv.org/):** computer vision library used for camera capture, perspective transforms, and board visualization
+- **[python-chess](https://python-chess.readthedocs.io/):** chess move validation and board state tracking
+- **[Onshape](https://www.onshape.com/):** used to CAD and design the custom chess board and pieces
